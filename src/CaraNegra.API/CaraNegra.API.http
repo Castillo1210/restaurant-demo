@@ -1,0 +1,16 @@
+@CaraNegra.API_HostAddress = http://localhost:5014
+
+GET {{CaraNegra.API_HostAddress}}/health
+Accept: application/json
+
+###
+
+POST {{CaraNegra.API_HostAddress}}/api/v1.0/auth/login
+Content-Type: application/json
+
+{
+  "nombreUsuario": "admin",
+  "password": "CambiarEstaClave123!"
+}
+
+###

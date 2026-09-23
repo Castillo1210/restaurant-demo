@@ -1,0 +1,50 @@
+# ──────────────────────────────────────────────────────────────
+# cara-negra-frontend — .gitignore
+# ──────────────────────────────────────────────────────────────
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+dist-ssr/
+*.local
+
+# TypeScript build info
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# Vite generated files
+vite.config.d.ts
+vite.config.js
+.vite/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+!.env.template
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+.idea/
+.DS_Store
+Thumbs.db
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

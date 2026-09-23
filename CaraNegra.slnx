@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/CaraNegra.API/CaraNegra.API.csproj" />
+    <Project Path="src/CaraNegra.Application/CaraNegra.Application.csproj" />
+    <Project Path="src/CaraNegra.Domain/CaraNegra.Domain.csproj" />
+    <Project Path="src/CaraNegra.Infrastructure/CaraNegra.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="src/CaraNegra.Tests/CaraNegra.Tests.csproj" />
+    <Project Path="src/CaraNegra.IntegrationTests/CaraNegra.IntegrationTests.csproj" />
+  </Folder>
+</Solution>

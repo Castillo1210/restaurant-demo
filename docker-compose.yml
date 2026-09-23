@@ -1,0 +1,84 @@
+# ============================================================
+#  docker-compose.yml — Cara Negra (Fase 6: despliegue)
+# ------------------------------------------------------------
+#  Levanta los 3 componentes del sistema: base de datos MySQL, backend
+#  (.NET 10 API) y frontend (React/Vite servido por nginx).
+#
+#  Uso:
+#    1. Copiar ".env.example" a ".env" y completar los valores reales
+#       (contraseña de MySQL, secreto JWT, IP de la impresora, etc.).
+#    2. docker compose up -d --build
+#    3. La API queda en http://localhost:8080 y el frontend en
+#       http://localhost:8081 (ver mapeo de puertos abajo).
+#
+#  Ver CONFIGURACION_LOCAL.md, sección "Fase 6 — Despliegue", para el
+#  detalle de cada variable y para la guía paso a paso.
+# ============================================================
+
+services:
+  db:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-caranegra}
+      MYSQL_USER: ${MYSQL_USER:-caranegra}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - caranegra_db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    ports:
+      # Expuesto solo para poder conectarse con un cliente MySQL local a
+      # depurar/revisar datos; quitar este mapeo en un servidor de producción
+      # expuesto a internet si no se necesita acceso externo a la base.
+      - "3306:3306"
+
+  api:
+    build:
+      context: .
+      dockerfile: src/CaraNegra.API/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__DefaultConnection: "Server=db;Port=3306;Database=${MYSQL_DATABASE:-caranegra};User=${MYSQL_USER:-caranegra};Password=${MYSQL_PASSWORD};"
+      JwtSettings__Secret: ${JWT_SECRET}
+      JwtSettings__Issuer: CaraNegraAPI
+      JwtSettings__Audience: CaraNegraClientes
+      # ASP.NET Core enlaza arrays desde variables de entorno con notación
+      # "Seccion__0", "Seccion__1"... (no se puede pasar un array JSON plano
+      # en una sola variable de entorno). Ajustar a los dominios reales del
+      # frontend en producción.
+      Cors__AllowedOrigins__0: ${FRONTEND_URL:-http://localhost:8081}
+      # Impresora de cocina (Fase 6): deshabilitada hasta configurar la IP real.
+      ImpresoraCocina__Habilitada: ${IMPRESORA_HABILITADA:-false}
+      ImpresoraCocina__Ip: ${IMPRESORA_IP:-}
+      ImpresoraCocina__Puerto: ${IMPRESORA_PUERTO:-9100}
+    volumes:
+      - caranegra_api_logs:/app/logs
+    ports:
+      - "8080:8080"
+
+  frontend:
+    build:
+      context: ./cara-negra-frontend
+      args:
+        # Debe apuntar a donde el NAVEGADOR del cliente pueda alcanzar la
+        # API (no al nombre de servicio interno "api" de Docker); en un
+        # servidor real normalmente es un dominio/HTTPS público.
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8080/api/v1}
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "8081:8080"
+
+volumes:
+  caranegra_db_data:
+  caranegra_api_logs:

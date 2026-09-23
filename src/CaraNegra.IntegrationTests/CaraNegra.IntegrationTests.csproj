@@ -1,0 +1,36 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="FluentAssertions" Version="8.10.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.9" />
+    <!-- Debe coincidir con la versión de Microsoft.EntityFrameworkCore.* usada en
+         CaraNegra.Infrastructure/CaraNegra.API (9.0.0). Tenerla en 10.0.9 aquí causaba
+         un MissingMethodException en tiempo de ejecución (choque de versiones de
+         Microsoft.EntityFrameworkCore.Relational al armar el modelo de ApplicationDbContext). -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="Moq" Version="4.20.72" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CaraNegra.API\CaraNegra.API.csproj" />
+    <ProjectReference Include="..\CaraNegra.Application\CaraNegra.Application.csproj" />
+    <ProjectReference Include="..\CaraNegra.Domain\CaraNegra.Domain.csproj" />
+    <ProjectReference Include="..\CaraNegra.Infrastructure\CaraNegra.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

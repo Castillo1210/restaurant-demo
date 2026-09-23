@@ -1,0 +1,13 @@
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+**/.vs/
+**/.vscode/
+**/logs/
+**/*.user
+.git/
+.gitignore
+*.drawio
+*.docx
+CONFIGURACION_LOCAL.md

@@ -1,0 +1,47 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    @apply bg-background text-white antialiased;
+    overscroll-behavior: none;
+  }
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 16px);
+  }
+}
+
+/* Comprobante de caja: al imprimir, solo se muestra el ticket (#recibo-imprimible),
+   nada más de la aplicación (mapa de mesas, modales, etc.). */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #recibo-imprimible,
+  #recibo-imprimible * {
+    visibility: visible;
+  }
+  #recibo-imprimible {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+}
