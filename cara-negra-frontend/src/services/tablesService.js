@@ -21,6 +21,13 @@ const mapMesa = (m) => ({
   numeroMesa: m.numeroMesa,
   status: ESTADO_TO_STATUS[m.estado] ?? 'free',
   estadoBackend: m.estado,
+  salonId: m.salonId,
+  salonNombre: m.salonNombre ?? '',
+  salonOrden: m.salonOrden,
+  salonActivo: m.salonActivo !== false,
+  pedidoActivoId: m.pedidoActivoId ?? null,
+  atendidoPorUsuarioId: m.atendidoPorUsuarioId ?? null,
+  atendidoPor: m.atendidoPor ?? '',
 });
 
 /**
@@ -32,8 +39,9 @@ export const getTables = async () => {
     const { data } = await api.get('/mesas');
     return data.map(mapMesa);
   } catch (error) {
-    console.error('Error al cargar mesas:', getApiErrorMessage(error));
-    return [];
+    // Se lanza (no se devuelve una lista vacía): un corte de Wi-Fi no debe verse como
+    // "aún no hay mesas configuradas".
+    throw new Error(getApiErrorMessage(error, 'No se pudieron cargar las mesas'));
   }
 };
 

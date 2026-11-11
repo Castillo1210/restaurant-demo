@@ -24,6 +24,9 @@ public class CreatePagoDto
     public decimal Monto { get; set; }
     public int MetodoPagoId { get; set; }
     public string? Referencia { get; set; }
+
+    /// <summary>Código único del cobro (lo genera la caja). Un reintento con el mismo código no cobra dos veces.</summary>
+    public string? OperacionId { get; set; }
 }
 
 public class PagoDetalleDto

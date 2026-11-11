@@ -10,6 +10,10 @@ const mapMesa = (m) => ({
   id: m.mesaId,
   numeroMesa: m.numeroMesa,
   estado: m.estado, // 'Disponible' | 'Ocupada' | 'Reservada' | 'Mantenimiento'
+  salonId: m.salonId,
+  salonNombre: m.salonNombre ?? '',
+  salonActivo: m.salonActivo !== false,
+  atendidoPor: m.atendidoPor ?? '',
   creadoEn: m.creadoEn,
 });
 
@@ -25,18 +29,18 @@ export const getMesasAdmin = async () => {
   }
 };
 
-export const createMesa = async (numeroMesa) => {
+export const createMesa = async (numeroMesa, salonId) => {
   try {
-    const { data } = await api.post('/mesas', { numeroMesa });
+    const { data } = await api.post('/mesas', { numeroMesa, salonId });
     return mapMesa(data);
   } catch (error) {
     throw new Error(getApiErrorMessage(error, 'No se pudo crear la mesa'));
   }
 };
 
-export const updateMesa = async (id, { numeroMesa, estado }) => {
+export const updateMesa = async (id, { numeroMesa, estado, salonId }) => {
   try {
-    const { data } = await api.put(`/mesas/${id}`, { numeroMesa, estado });
+    const { data } = await api.put(`/mesas/${id}`, { numeroMesa, estado, salonId });
     return mapMesa(data);
   } catch (error) {
     throw new Error(getApiErrorMessage(error, 'No se pudo actualizar la mesa'));
@@ -45,7 +49,7 @@ export const updateMesa = async (id, { numeroMesa, estado }) => {
 
 /**
  * Desactiva una mesa (la pasa a estado Mantenimiento). Para reactivarla,
- * usa updateMesa(id, { numeroMesa, estado: 'Disponible' }).
+ * usa updateMesa(id, { numeroMesa, estado: 'Disponible', salonId }).
  */
 export const deleteMesa = async (id) => {
   try {

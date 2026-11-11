@@ -8,6 +8,7 @@
 // ============================================================
 
 import api, { getApiErrorMessage } from './api';
+import { urlImagenProducto } from '../utils/imagenProducto';
 
 const mapCategoria = (c) => ({
   id: c.categoriaId,
@@ -26,6 +27,8 @@ const mapProducto = (p) => ({
   tipo: p.tipo,
   categoriaId: p.categoriaId,
   categoriaNombre: p.categoriaNombre,
+  imagenVersion: p.imagenVersion ?? 0,
+  imagen: urlImagenProducto(p.productoId, p.imagenVersion ?? 0),
   creadoEn: p.creadoEn,
 });
 
@@ -133,5 +136,39 @@ export const deleteProducto = async (id) => {
     await api.delete(`/productos/${id}`);
   } catch (error) {
     throw new Error(getApiErrorMessage(error, 'No se pudo desactivar el producto'));
+  }
+};
+
+// ─── Foto del producto ──────────────────────────────────────────────────────
+
+/**
+ * Sube (o reemplaza) la foto de un producto. Recibe la imagen ya comprimida (ver
+ * utils/imagenProducto.comprimirImagen). Devuelve { productoId, imagenVersion }.
+ * @param {number} id
+ * @param {Blob} imagen
+ */
+export const subirImagenProducto = async (id, imagen) => {
+  try {
+    const datos = new FormData();
+    const extension = imagen.type === 'image/webp' ? 'webp' : imagen.type === 'image/png' ? 'png' : 'jpg';
+    datos.append('archivo', imagen, `producto-${id}.${extension}`);
+    const { data } = await api.put(`/productos/${id}/imagen`, datos, {
+      // axios arma el multipart/form-data con su "boundary" al ver un FormData.
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 60000,
+    });
+    return data;
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, 'No se pudo subir la foto'));
+  }
+};
+
+/** Quita la foto de un producto. */
+export const quitarImagenProducto = async (id) => {
+  try {
+    const { data } = await api.delete(`/productos/${id}/imagen`);
+    return data;
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, 'No se pudo quitar la foto'));
   }
 };

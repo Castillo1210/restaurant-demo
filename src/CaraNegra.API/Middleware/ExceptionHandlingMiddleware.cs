@@ -31,9 +31,15 @@ public class ExceptionHandlingMiddleware
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unhandled exception occurred. Path: {Path}, Method: {Method}", 
-                    context.Request.Path, context.Request.Method);
-                
+                // Las reglas de negocio ("la mesa ya tiene un pedido", "pedido no encontrado"…) no son
+                // fallas del sistema: van al log como aviso (Warning), no como error. Lo inesperado, como error.
+                if (EsErrorEsperado(ex))
+                    _logger.LogWarning(ex, "Solicitud rechazada: {Mensaje}. Path: {Path}, Method: {Method}",
+                        ex.Message, context.Request.Path, context.Request.Method);
+                else
+                    _logger.LogError(ex, "Unhandled exception occurred. Path: {Path}, Method: {Method}",
+                        context.Request.Path, context.Request.Method);
+
                 await HandleExceptionAsync(context, ex, correlationId);
             }
         }
@@ -42,9 +48,25 @@ public class ExceptionHandlingMiddleware
     private static async Task HandleExceptionAsync(HttpContext context, Exception exception, string correlationId)
     {
         context.Response.ContentType = "application/json";
-        
-        var (statusCode, title, detail) = exception switch
+
+        var (statusCode, title, detail) = Clasificar(exception);
+
+        context.Response.StatusCode = (int)statusCode;
+
+        var json = JsonSerializer.Serialize(CrearCuerpo(statusCode, title, detail, correlationId), new JsonSerializerOptions
         {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        });
+
+        await context.Response.WriteAsync(json);
+    }
+
+    /// <summary>Código HTTP, título y mensaje para el usuario según el tipo de excepción.</summary>
+    public static (HttpStatusCode Status, string Title, string Detail) Clasificar(Exception exception) =>
+        exception switch
+        {
+            _ when EsEsperaDeBloqueo(exception) => (HttpStatusCode.Conflict, "Operación en curso",
+                "Otra persona está trabajando sobre este mismo pedido o mesa en este momento. Espera unos segundos y vuelve a intentarlo."),
             KeyNotFoundException => (HttpStatusCode.NotFound, "No encontrado", exception.Message),
             UnauthorizedAccessException => (HttpStatusCode.Unauthorized, "No autorizado", exception.Message),
             InvalidOperationException => (HttpStatusCode.BadRequest, "Operación inválida", exception.Message),
@@ -52,23 +74,35 @@ public class ExceptionHandlingMiddleware
             _ => (HttpStatusCode.InternalServerError, "Error interno del servidor", "Ha ocurrido un error inesperado.")
         };
 
-        context.Response.StatusCode = (int)statusCode;
+    /// <summary>Cuerpo JSON de error. Incluye "mensaje" (lo que el frontend lee primero).</summary>
+    public static object CrearCuerpo(HttpStatusCode statusCode, string title, string detail, string? correlationId) => new
+    {
+        correlationId,
+        title,
+        detail,
+        mensaje = detail,
+        status = (int)statusCode,
+        timestamp = DateTime.UtcNow
+    };
 
-        var response = new
+    /// <summary>Errores de reglas de negocio o de datos del usuario (4xx), no fallas del sistema.</summary>
+    public static bool EsErrorEsperado(Exception exception) =>
+        EsEsperaDeBloqueo(exception)
+        || exception is KeyNotFoundException or UnauthorizedAccessException or InvalidOperationException or ArgumentException;
+
+    /// <summary>
+    /// MySQL: 1205 = se agotó la espera de un bloqueo, 1213 = interbloqueo. Pasa solo si dos
+    /// operaciones sobre el mismo pedido/mesa se cruzan (ver IApplicationDbContext); no es un error
+    /// del sistema, basta con reintentar.
+    /// </summary>
+    private static bool EsEsperaDeBloqueo(Exception exception)
+    {
+        for (var ex = exception; ex != null; ex = ex.InnerException)
         {
-            correlationId,
-            title,
-            detail,
-            status = (int)statusCode,
-            timestamp = DateTime.UtcNow
-        };
-
-        var json = JsonSerializer.Serialize(response, new JsonSerializerOptions 
-        { 
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase 
-        });
-
-        await context.Response.WriteAsync(json);
+            if (ex is MySqlConnector.MySqlException mysql && (mysql.Number == 1205 || mysql.Number == 1213))
+                return true;
+        }
+        return false;
     }
 }
 
@@ -78,4 +112,4 @@ public static class ExceptionHandlingMiddlewareExtensions
     {
         return builder.UseMiddleware<ExceptionHandlingMiddleware>();
     }
-}
+}

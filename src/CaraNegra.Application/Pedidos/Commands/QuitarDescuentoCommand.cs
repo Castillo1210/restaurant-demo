@@ -23,8 +23,12 @@ public class QuitarDescuentoCommandHandler : IRequestHandler<QuitarDescuentoComm
 
     public async Task<PedidoDto> Handle(QuitarDescuentoCommand request, CancellationToken cancellationToken)
     {
+        // Bloquea el pedido: si llega otra operación sobre él a la vez, espera a que esta termine.
+        await using var tx = await _context.IniciarTransaccionAsync(cancellationToken);
+        await _context.BloquearPedidoAsync(request.PedidoId, cancellationToken);
+
         var pedido = await _context.Pedidos
-            .Include(p => p.Mesa)
+            .Include(p => p.Mesa).ThenInclude(m => m.Salon)
             .Include(p => p.Usuario)
             .Include(p => p.DetallesPedidos)
                 .ThenInclude(d => d.Producto)
@@ -53,6 +57,7 @@ public class QuitarDescuentoCommandHandler : IRequestHandler<QuitarDescuentoComm
         pedido.Total = pedido.SubTotal;
 
         await _context.SaveChangesAsync(cancellationToken);
+        await tx.ConfirmarAsync(cancellationToken);
 
         await _hub.NotificarPedidoActualizado(new PedidoActualizadoEvent
         {
@@ -71,12 +76,14 @@ public class QuitarDescuentoCommandHandler : IRequestHandler<QuitarDescuentoComm
         {
             PedidoId = pedido.PedidoId,
             MesaId = pedido.MesaId,
+            SalonNombre = pedido.Mesa?.Salon?.Nombre ?? string.Empty,
             MesaNumero = pedido.Mesa?.NumeroMesa ?? string.Empty,
             UsuarioId = pedido.UsuarioId,
             UsuarioNombre = pedido.Usuario?.NombreCompleto ?? string.Empty,
             SubTotal = pedido.SubTotal,
             Total = pedido.Total,
             EstadoPedido = pedido.EstadoPedido,
+            Comentario = pedido.Comentario,
             CreadoEn = pedido.CreadoEn,
             Descuento = null, // el descuento se acaba de quitar
             Detalles = pedido.DetallesPedidos.Select(d => new PedidoDetalleDto

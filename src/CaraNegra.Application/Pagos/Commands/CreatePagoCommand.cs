@@ -1,5 +1,8 @@
+using CaraNegra.Application.Jornadas;
 using CaraNegra.Application.Common.Interfaces;
+using CaraNegra.Application.Mesas;
 using CaraNegra.Application.Pagos.DTOs;
+using CaraNegra.Application.Pedidos;
 using CaraNegra.Domain.Entities;
 using CaraNegra.Domain.Enums;
 using MediatR;
@@ -13,18 +16,43 @@ public class CreatePagoCommandHandler : IRequestHandler<CreatePagoCommand, PagoD
 {
     private readonly IApplicationDbContext _context;
     private readonly IPedidosHubService _hub;
+    private readonly OperacionesRecientes _operaciones;
 
-    public CreatePagoCommandHandler(IApplicationDbContext context, IPedidosHubService hub)
+    public CreatePagoCommandHandler(IApplicationDbContext context, IPedidosHubService hub, OperacionesRecientes operaciones)
     {
         _context = context;
         _hub = hub;
+        _operaciones = operaciones;
     }
 
     public async Task<PagoDto> Handle(CreatePagoCommand request, CancellationToken cancellationToken)
     {
+        // Doble toque en "Cobrar", dos cajas o un reintento por Wi-Fi lento: el pedido se bloquea
+        // y la segunda petición espera; al continuar ve el pago de la primera (saldo ya cubierto)
+        // y se rechaza en vez de cobrar dos veces. La jornada se bloquea en modo compartido para
+        // que el cierre de caja no ocurra a mitad de un cobro.
+        await using var tx = await _context.IniciarTransaccionAsync(cancellationToken);
+        await _context.BloquearJornadaAbiertaAsync(exclusivo: false, cancellationToken);
+        await _context.BloquearPedidoAsync(request.Dto.PedidoId, cancellationToken);
+
+        // Reintento de un cobro que ya se grabó (la respuesta se perdió por el Wi-Fi o tardó):
+        // se devuelve ese mismo pago en vez de cobrar otra vez.
+        var claveOperacion = OperacionesRecientes.Clave(request.Dto.OperacionId);
+        if (claveOperacion != null && _operaciones.YaProcesada(claveOperacion, out var pagoPrevioId))
+        {
+            var previo = await _context.Pagos
+                .Include(p => p.MetodoPago)
+                .Include(p => p.Pedido).ThenInclude(p => p.Mesa).ThenInclude(m => m.Salon)
+                .FirstOrDefaultAsync(p => p.PagoId == pagoPrevioId && p.PedidoId == request.Dto.PedidoId, cancellationToken);
+            if (previo != null) return MapToDto(previo);
+        }
+
+        // Sin jornada abierta no se cobra: cada pago queda en la jornada (para el arqueo).
+        var jornada = await JornadaReglas.RequerirAbiertaAsync(_context, cancellationToken);
+
         // Obtener pedido con navegaciones necesarias
         var pedido = await _context.Pedidos
-            .Include(p => p.Mesa)
+            .Include(p => p.Mesa).ThenInclude(m => m.Salon)
             .Include(p => p.Pagos)
             .FirstOrDefaultAsync(p => p.PedidoId == request.Dto.PedidoId, cancellationToken)
             ?? throw new KeyNotFoundException($"Pedido {request.Dto.PedidoId} no encontrado");
@@ -54,8 +82,12 @@ public class CreatePagoCommandHandler : IRequestHandler<CreatePagoCommand, PagoD
             PedidoId = pedido.PedidoId,
             Monto = request.Dto.Monto,
             MetodoPagoId = metodoPago.MetodoPagoId,
-            Referencia = request.Dto.Referencia
+            Referencia = request.Dto.Referencia,
+            JornadaId = jornada.JornadaId
         };
+
+        // Pedido de antes de las jornadas: queda en la jornada en que se cobra.
+        pedido.JornadaId ??= jornada.JornadaId;
 
         _context.Pagos.Add(pago);
         await _context.SaveChangesAsync(cancellationToken);
@@ -69,13 +101,9 @@ public class CreatePagoCommandHandler : IRequestHandler<CreatePagoCommand, PagoD
         {
             pedido.EstadoPedido = EstadoPedido.Entregado;
 
-            // Liberar mesa si no hay otros pedidos activos. Importante: el cambio de estado
-            // de arriba todavía no se guardó en la base de datos (el SaveChangesAsync está
-            // más abajo), así que la consulta de "otros pedidos activos" debe excluir
-            // explícitamente ESTE pedido — si no, se ve a sí mismo con su estado viejo
-            // (todavía no Entregado) y nunca libera la mesa, ni siquiera cuando es el único
-            // pedido activo de esa mesa.
-            mesaLiberada = await LiberarMesaSiCorresponde(pedido.MesaId, pedido.PedidoId, cancellationToken);
+            // Liberar la mesa si no le queda otro pedido abierto (ver MesaOcupacion: excluye
+            // este pedido, cuyo nuevo estado todavía no está guardado).
+            mesaLiberada = await MesaOcupacion.LiberarSiQuedaLibreAsync(_context, pedido.MesaId, pedido.PedidoId, cancellationToken);
         }
         else if (pedido.EstadoPedido == EstadoPedido.Listo)
         {
@@ -84,11 +112,23 @@ public class CreatePagoCommandHandler : IRequestHandler<CreatePagoCommand, PagoD
 
         await _context.SaveChangesAsync(cancellationToken);
 
+        // Se registra antes de confirmar: un reintento que espera el bloqueo del pedido ya lo encuentra.
+        if (claveOperacion != null) _operaciones.Registrar(claveOperacion, pago.PagoId);
+        try
+        {
+            await tx.ConfirmarAsync(cancellationToken);
+        }
+        catch
+        {
+            if (claveOperacion != null) _operaciones.Olvidar(claveOperacion);
+            throw;
+        }
+
         // Recargar con navegaciones para el DTO
         var pagoCreado = await _context.Pagos
             .Include(p => p.MetodoPago)
             .Include(p => p.Pedido)
-                .ThenInclude(p => p.Mesa)
+                .ThenInclude(p => p.Mesa).ThenInclude(m => m.Salon)
             .FirstAsync(p => p.PagoId == pago.PagoId, cancellationToken);
 
         await _hub.NotificarPagoRecibido(new PagoRecibidoEvent
@@ -115,26 +155,6 @@ public class CreatePagoCommandHandler : IRequestHandler<CreatePagoCommand, PagoD
         return MapToDto(pagoCreado);
     }
 
-    private async Task<bool> LiberarMesaSiCorresponde(int mesaId, int pedidoIdActual, CancellationToken ct)
-    {
-        var mesa = await _context.Mesas.FindAsync(new object[] { mesaId }, ct);
-        if (mesa != null && mesa.Estado != EstadoMesa.Disponible)
-        {
-            var otrosPedidos = await _context.Pedidos
-                .AnyAsync(p => p.MesaId == mesaId
-                    && p.PedidoId != pedidoIdActual
-                    && p.EstadoPedido != EstadoPedido.Cancelado
-                    && p.EstadoPedido != EstadoPedido.Entregado, ct);
-
-            if (!otrosPedidos)
-            {
-                mesa.Estado = EstadoMesa.Disponible;
-                return true;
-            }
-        }
-        return false;
-    }
-
     private PagoDto MapToDto(Pago pago)
     {
         return new PagoDto
@@ -153,4 +173,4 @@ public class CreatePagoCommandHandler : IRequestHandler<CreatePagoCommand, PagoD
             CreadoEn = pago.CreadoEn
         };
     }
-}
+}

@@ -13,6 +13,7 @@ import { getMetodoPagoIcon } from '../services/metodoPagoIcons';
 import { getMesasAdmin } from '../services/mesasAdminService';
 import { getPedidos } from '../services/ordersService';
 import { agruparDetallesPorProducto } from '../utils/agruparDetalles';
+import { etiquetaMesa } from '../utils/mesaLabel';
 
 const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 const toInputValue = (d) => {
@@ -160,7 +161,7 @@ export default function AdminReportes() {
             className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors ${
               preset === p.key
                 ? 'bg-primary text-white shadow-glow-orange'
-                : 'bg-card text-gray-400 border border-gray-800/50 hover:text-white'
+                : 'bg-card text-gray-400 border border-gray-800/50 hover:text-ink'
             }`}
           >
             {p.label}
@@ -173,13 +174,13 @@ export default function AdminReportes() {
           type="date"
           value={toInputValue(fechaDesde)}
           onChange={(e) => cambiarFechaManual('desde', e.target.value)}
-          className="flex-1 bg-card border border-gray-800/50 rounded-2xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-primary transition-colors"
+          className="flex-1 bg-card border border-gray-800/50 rounded-2xl px-3 py-2.5 text-ink text-sm focus:outline-none focus:border-primary transition-colors"
         />
         <input
           type="date"
           value={toInputValue(fechaHasta)}
           onChange={(e) => cambiarFechaManual('hasta', e.target.value)}
-          className="flex-1 bg-card border border-gray-800/50 rounded-2xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-primary transition-colors"
+          className="flex-1 bg-card border border-gray-800/50 rounded-2xl px-3 py-2.5 text-ink text-sm focus:outline-none focus:border-primary transition-colors"
         />
       </div>
 
@@ -187,7 +188,7 @@ export default function AdminReportes() {
         <button
           onClick={handleExportarResumen}
           disabled={exportandoResumen || isLoading}
-          className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-dashed border-gray-700 text-gray-400 hover:text-white hover:border-primary/50 transition-colors font-semibold text-sm disabled:opacity-50"
+          className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-dashed border-gray-700 text-gray-400 hover:text-ink hover:border-primary/50 transition-colors font-semibold text-sm disabled:opacity-50"
         >
           <Download size={15} />
           {exportandoResumen ? 'Exportando…' : 'Exportar resumen a Excel'}
@@ -205,21 +206,21 @@ export default function AdminReportes() {
                 <Wallet size={15} />
                 <span className="text-[10px] font-bold uppercase tracking-wider">Total ventas</span>
               </div>
-              <p className="text-2xl font-extrabold text-white">S/ {resumen.totalVentas.toFixed(2)}</p>
+              <p className="text-2xl font-extrabold text-ink">S/ {resumen.totalVentas.toFixed(2)}</p>
             </div>
             <div className="bg-card border border-gray-800/50 rounded-2xl p-4">
               <div className="flex items-center gap-2 text-gray-400 mb-1.5">
                 <TrendingUp size={15} />
                 <span className="text-[10px] font-bold uppercase tracking-wider">Ticket promedio</span>
               </div>
-              <p className="text-2xl font-extrabold text-white">S/ {resumen.ticketPromedio.toFixed(2)}</p>
+              <p className="text-2xl font-extrabold text-ink">S/ {resumen.ticketPromedio.toFixed(2)}</p>
             </div>
             <div className="bg-card border border-gray-800/50 rounded-2xl p-4">
               <div className="flex items-center gap-2 text-gray-400 mb-1.5">
                 <Receipt size={15} />
                 <span className="text-[10px] font-bold uppercase tracking-wider">Pedidos</span>
               </div>
-              <p className="text-2xl font-extrabold text-white">{resumen.cantidadPedidos}</p>
+              <p className="text-2xl font-extrabold text-ink">{resumen.cantidadPedidos}</p>
               <p className="text-[11px] text-gray-500 mt-0.5">{resumen.cantidadPedidosPagados} pagados</p>
             </div>
             <div className="bg-card border border-gray-800/50 rounded-2xl p-4">
@@ -227,14 +228,14 @@ export default function AdminReportes() {
                 <Ban size={15} />
                 <span className="text-[10px] font-bold uppercase tracking-wider">Cancelados</span>
               </div>
-              <p className="text-2xl font-extrabold text-white">{resumen.cantidadPedidosCancelados}</p>
+              <p className="text-2xl font-extrabold text-ink">{resumen.cantidadPedidosCancelados}</p>
             </div>
             <div className="bg-card border border-gray-800/50 rounded-2xl p-4 col-span-2">
               <div className="flex items-center gap-2 text-gray-400 mb-1.5">
                 <Percent size={15} />
                 <span className="text-[10px] font-bold uppercase tracking-wider">Total descuentos otorgados</span>
               </div>
-              <p className="text-2xl font-extrabold text-white">S/ {resumen.totalDescuentos.toFixed(2)}</p>
+              <p className="text-2xl font-extrabold text-ink">S/ {resumen.totalDescuentos.toFixed(2)}</p>
             </div>
           </div>
 
@@ -251,7 +252,7 @@ export default function AdminReportes() {
                       {getMetodoPagoIcon(v.metodoPagoNombre)} {v.metodoPagoNombre}
                       <span className="text-gray-600 text-xs ml-1.5">({v.cantidadPagos})</span>
                     </span>
-                    <span className="font-bold text-white text-sm">S/ {v.total.toFixed(2)}</span>
+                    <span className="font-bold text-ink text-sm">S/ {v.total.toFixed(2)}</span>
                   </div>
                 ))}
               </div>
@@ -274,7 +275,7 @@ export default function AdminReportes() {
                       {idx + 1}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <p className="font-bold text-white text-sm truncate">{p.productoNombre}</p>
+                      <p className="font-bold text-ink text-sm truncate">{p.productoNombre}</p>
                       <p className="text-xs text-gray-500">{p.categoriaNombre} · {p.cantidadVendida} vendidos</p>
                     </div>
                     <p className="text-primary font-extrabold text-sm flex-shrink-0">S/ {p.totalVendido.toFixed(2)}</p>
@@ -297,17 +298,17 @@ export default function AdminReportes() {
           <select
             value={mesaSeleccionadaId}
             onChange={(e) => setMesaSeleccionadaId(e.target.value)}
-            className="flex-1 bg-card border border-gray-800/50 rounded-2xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-primary transition-colors"
+            className="flex-1 bg-card border border-gray-800/50 rounded-2xl px-3 py-2.5 text-ink text-sm focus:outline-none focus:border-primary transition-colors"
           >
             <option value="">Selecciona una mesa…</option>
             {mesas.map((m) => (
-              <option key={m.id} value={m.id}>Mesa {m.numeroMesa}</option>
+              <option key={m.id} value={m.id}>{etiquetaMesa(m.salonNombre, m.numeroMesa)}</option>
             ))}
           </select>
           <button
             onClick={handleExportarPedidosMesa}
             disabled={!mesaSeleccionadaId || exportandoMesa || pedidosMesa.length === 0}
-            className="px-4 rounded-2xl border border-dashed border-gray-700 text-gray-400 hover:text-white hover:border-primary/50 transition-colors disabled:opacity-40 flex items-center gap-1.5 text-xs font-semibold"
+            className="px-4 rounded-2xl border border-dashed border-gray-700 text-gray-400 hover:text-ink hover:border-primary/50 transition-colors disabled:opacity-40 flex items-center gap-1.5 text-xs font-semibold"
             title="Exportar a Excel"
           >
             <Download size={14} />
@@ -332,7 +333,7 @@ export default function AdminReportes() {
             {pedidosMesa.map((pedido) => (
               <div key={pedido.id} className="bg-card border border-gray-800/50 rounded-2xl p-3.5">
                 <div className="flex justify-between items-center mb-1.5">
-                  <span className="text-sm font-bold text-white">Pedido #{pedido.id}</span>
+                  <span className="text-sm font-bold text-ink">Pedido #{pedido.id}</span>
                   <span className="text-xs text-gray-500">
                     {new Date(pedido.creadoEn).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' })}
                   </span>

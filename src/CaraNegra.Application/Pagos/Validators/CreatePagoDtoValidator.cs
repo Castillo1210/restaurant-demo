@@ -1,6 +1,6 @@
 using CaraNegra.Application.Common.Interfaces;
+using CaraNegra.Application.Mesas;
 using CaraNegra.Application.Pagos.DTOs;
-using CaraNegra.Domain.Enums;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 
@@ -38,14 +38,15 @@ public class CreatePagoDtoValidator : AbstractValidator<CreatePagoDto>
     private bool BeValidPedidoParaPago(int pedidoId)
     {
         return _context.Pedidos
-            .Any(p => p.PedidoId == pedidoId
-                && p.EstadoPedido != EstadoPedido.Cancelado
-                && p.EstadoPedido != EstadoPedido.Entregado);
+            .Where(MesaOcupacion.PedidoAbierto)
+            .Any(p => p.PedidoId == pedidoId);
     }
 
     private bool BeMontoValido(CreatePagoDto dto, decimal monto)
     {
+        // Sin seguimiento: el handler relee el pedido después de bloquearlo.
         var pedido = _context.Pedidos
+            .AsNoTracking()
             .Include(p => p.Pagos)
             .FirstOrDefault(p => p.PedidoId == dto.PedidoId);
 
@@ -61,4 +62,4 @@ public class CreatePagoDtoValidator : AbstractValidator<CreatePagoDto>
     {
         return _context.MetodosPago.Any(m => m.MetodoPagoId == metodoPagoId && m.EstaActivo);
     }
-}
+}

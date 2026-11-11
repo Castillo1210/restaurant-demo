@@ -35,15 +35,8 @@ public class ArticulosController : ControllerBase
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(int id)
     {
-        try
-        {
-            var result = await _mediator.Send(new GetArticuloByIdQuery(id));
-            return Ok(result);
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { mensaje = ex.Message });
-        }
+        var result = await _mediator.Send(new GetArticuloByIdQuery(id));
+        return Ok(result);
     }
 
     [HttpPost]
@@ -56,29 +49,15 @@ public class ArticulosController : ControllerBase
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateArticuloDto dto)
     {
-        try
-        {
-            var result = await _mediator.Send(new UpdateArticuloCommand(id, dto));
-            return Ok(result);
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { mensaje = ex.Message });
-        }
+        var result = await _mediator.Send(new UpdateArticuloCommand(id, dto));
+        return Ok(result);
     }
 
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
     {
-        try
-        {
-            await _mediator.Send(new DeleteArticuloCommand(id));
-            return Ok(new { mensaje = "Artículo desactivado correctamente." });
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { mensaje = ex.Message });
-        }
+        await _mediator.Send(new DeleteArticuloCommand(id));
+        return Ok(new { mensaje = "Artículo desactivado correctamente." });
     }
 
     /// <summary>
@@ -97,19 +76,8 @@ public class ArticulosController : ControllerBase
     [HttpPost("{id}/movimientos")]
     public async Task<IActionResult> RegistrarMovimiento(int id, [FromBody] CreateMovimientoArticuloDto dto)
     {
-        try
-        {
-            var usuarioId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-            var result = await _mediator.Send(new RegistrarMovimientoArticuloCommand(id, usuarioId, dto));
-            return Ok(result);
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { mensaje = ex.Message });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { mensaje = ex.Message });
-        }
+        var usuarioId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        var result = await _mediator.Send(new RegistrarMovimientoArticuloCommand(id, usuarioId, dto));
+        return Ok(result);
     }
 }

@@ -32,35 +32,13 @@ public class CocinaController : ControllerBase
     [HttpPatch("pedidos/{pedidoId}/items/{detalleId}/estado")]
     public async Task<IActionResult> CambiarEstadoItem(int pedidoId, int detalleId, [FromBody] CambiarEstadoItemCocinaDto dto)
     {
-        try
-        {
-            return Ok(await _mediator.Send(new CambiarEstadoItemCocinaCommand(pedidoId, detalleId, dto.Estado)));
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { mensaje = ex.Message });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { mensaje = ex.Message });
-        }
+        return Ok(await _mediator.Send(new CambiarEstadoItemCocinaCommand(pedidoId, detalleId, dto.Estado)));
     }
 
     /// <summary>Mueve el pedido completo a EnPreparacion ("Empezar") o Listo ("Pedido listo").</summary>
     [HttpPatch("pedidos/{pedidoId}/estado")]
     public async Task<IActionResult> CambiarEstadoPedido(int pedidoId, [FromBody] CambiarEstadoPedidoCocinaDto dto)
     {
-        try
-        {
-            return Ok(await _mediator.Send(new CambiarEstadoPedidoCocinaCommand(pedidoId, dto.Estado)));
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { mensaje = ex.Message });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { mensaje = ex.Message });
-        }
+        return Ok(await _mediator.Send(new CambiarEstadoPedidoCocinaCommand(pedidoId, dto.Estado)));
     }
 }

@@ -29,8 +29,12 @@ public class AplicarDescuentoCommandHandler : IRequestHandler<AplicarDescuentoCo
 
     public async Task<PedidoDto> Handle(AplicarDescuentoCommand request, CancellationToken cancellationToken)
     {
+        // Bloquea el pedido: si llega otra operación sobre él a la vez, espera a que esta termine.
+        await using var tx = await _context.IniciarTransaccionAsync(cancellationToken);
+        await _context.BloquearPedidoAsync(request.PedidoId, cancellationToken);
+
         var pedido = await _context.Pedidos
-            .Include(p => p.Mesa)
+            .Include(p => p.Mesa).ThenInclude(m => m.Salon)
             .Include(p => p.Usuario)
             .Include(p => p.DetallesPedidos)
                 .ThenInclude(d => d.Producto)
@@ -88,9 +92,10 @@ public class AplicarDescuentoCommandHandler : IRequestHandler<AplicarDescuentoCo
         pedido.Total = DescuentoCalculator.CalcularTotal(pedido.SubTotal, descuento);
 
         await _context.SaveChangesAsync(cancellationToken);
+        await tx.ConfirmarAsync(cancellationToken);
 
         var pedidoActualizado = await _context.Pedidos
-            .Include(p => p.Mesa)
+            .Include(p => p.Mesa).ThenInclude(m => m.Salon)
             .Include(p => p.Usuario)
             .Include(p => p.DetallesPedidos)
                 .ThenInclude(d => d.Producto)
@@ -131,12 +136,14 @@ public class AplicarDescuentoCommandHandler : IRequestHandler<AplicarDescuentoCo
         {
             PedidoId = pedido.PedidoId,
             MesaId = pedido.MesaId,
+            SalonNombre = pedido.Mesa?.Salon?.Nombre ?? string.Empty,
             MesaNumero = pedido.Mesa?.NumeroMesa ?? string.Empty,
             UsuarioId = pedido.UsuarioId,
             UsuarioNombre = pedido.Usuario?.NombreCompleto ?? string.Empty,
             SubTotal = pedido.SubTotal,
             Total = pedido.Total,
             EstadoPedido = pedido.EstadoPedido,
+            Comentario = pedido.Comentario,
             CreadoEn = pedido.CreadoEn,
             Descuento = MapDescuento(pedido),
             Detalles = pedido.DetallesPedidos.Select(d => new PedidoDetalleDto

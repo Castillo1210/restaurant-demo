@@ -39,7 +39,8 @@ public class GetAllProductosQueryHandler : IRequestHandler<GetAllProductosQuery,
             Tipo = p.Tipo,
             CategoriaId = p.CategoriaId,
             CategoriaNombre = p.Categoria.Nombre,
+            ImagenVersion = p.ImagenVersion,
             CreadoEn = p.CreadoEn
         }).ToListAsync(cancellationToken);
     }
-}
+}

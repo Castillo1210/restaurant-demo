@@ -7,6 +7,7 @@
 
 import api, { getApiErrorMessage } from './api';
 import { getCategoryIcon } from './categoryIcons';
+import { urlImagenProducto } from '../utils/imagenProducto';
 
 const mapCategoria = (c) => ({
   id: c.categoriaId,
@@ -23,9 +24,8 @@ const mapProducto = (p) => ({
   price: p.precio,
   disponible: p.estaDisponible,
   tipo: p.tipo,
-  // El catálogo aún no maneja imágenes de producto; se usa un
-  // placeholder neutro hasta que se agregue esa capacidad.
-  image: null,
+  // Foto del plato (o null: se muestra un ícono en su lugar).
+  image: urlImagenProducto(p.productoId, p.imagenVersion ?? 0),
 });
 
 /**

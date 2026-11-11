@@ -15,33 +15,40 @@ public class UpdateMesaCommandHandler : IRequestHandler<UpdateMesaCommand, MesaD
 
     public async Task<MesaDto> Handle(UpdateMesaCommand request, CancellationToken cancellationToken)
     {
+        // Bloquea la mesa: si a la vez un mozo abre un pedido en ella, uno espera al otro.
+        await using var tx = await _context.IniciarTransaccionAsync(cancellationToken);
+        await _context.BloquearMesaAsync(request.MesaId, cancellationToken);
+
         var mesa = await _context.Mesas
+            .Include(m => m.Salon)
             .FirstOrDefaultAsync(m => m.MesaId == request.MesaId, cancellationToken)
             ?? throw new KeyNotFoundException($"Mesa {request.MesaId} no encontrada");
 
-        // Solo validar unicidad si el número realmente cambió, excluyendo la propia mesa
-        // (antes esta comprobación vivía en el validador del DTO, que no tiene acceso al
-        // MesaId de la ruta y por eso rechazaba guardar una mesa con su mismo número).
-        if (request.Dto.NumeroMesa != mesa.NumeroMesa)
+        var salon = await _context.Salones
+            .FirstOrDefaultAsync(s => s.SalonId == request.Dto.SalonId, cancellationToken)
+            ?? throw new KeyNotFoundException($"Salón {request.Dto.SalonId} no encontrado");
+
+        var numero = request.Dto.NumeroMesa.Trim();
+
+        // Solo validar unicidad si cambió el número o el salón, excluyendo la propia mesa
+        // (la validación vive aquí y no en el validador porque este necesita el MesaId de la ruta).
+        if (numero != mesa.NumeroMesa || salon.SalonId != mesa.SalonId)
         {
             var yaExiste = await _context.Mesas
-                .AnyAsync(m => m.NumeroMesa == request.Dto.NumeroMesa && m.MesaId != request.MesaId, cancellationToken);
+                .AnyAsync(m => m.SalonId == salon.SalonId && m.NumeroMesa == numero && m.MesaId != mesa.MesaId, cancellationToken);
 
             if (yaExiste)
-                throw new InvalidOperationException($"Ya existe otra mesa con el número {request.Dto.NumeroMesa}");
+                throw new InvalidOperationException($"Ya existe otra mesa {numero} en el salón {salon.Nombre}");
         }
 
-        mesa.NumeroMesa = request.Dto.NumeroMesa;
-        mesa.Estado = request.Dto.Estado;
+        mesa.NumeroMesa = numero;
+        mesa.Estado = await MesaOcupacion.EstadoAlEditarAsync(_context, mesa, request.Dto.Estado, cancellationToken);
+        mesa.SalonId = salon.SalonId;
+        mesa.Salon = salon;
 
         await _context.SaveChangesAsync(cancellationToken);
+        await tx.ConfirmarAsync(cancellationToken);
 
-        return new MesaDto
-        {
-            MesaId = mesa.MesaId,
-            NumeroMesa = mesa.NumeroMesa,
-            Estado = mesa.Estado,
-            CreadoEn = mesa.CreadoEn
-        };
+        return MesaMapper.ToDto(mesa);
     }
 }

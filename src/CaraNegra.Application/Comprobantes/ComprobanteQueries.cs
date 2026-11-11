@@ -10,9 +10,8 @@ internal static class ComprobanteQueries
     public static IQueryable<Comprobante> ConDetalle(IApplicationDbContext context) =>
         context.Comprobantes
             .Include(c => c.Usuario)
-            .Include(c => c.Pedido).ThenInclude(p => p.Mesa)
+            .Include(c => c.Pedido).ThenInclude(p => p.Mesa).ThenInclude(m => m.Salon)
             .Include(c => c.Pedido).ThenInclude(p => p.Usuario)
             .Include(c => c.Pedido).ThenInclude(p => p.DetallesPedidos).ThenInclude(d => d.Producto)
-            .Include(c => c.Pedido).ThenInclude(p => p.Pagos).ThenInclude(p => p.MetodoPago)
-            .AsSplitQuery();
+            .Include(c => c.Pedido).ThenInclude(p => p.Pagos).ThenInclude(p => p.MetodoPago);
 }

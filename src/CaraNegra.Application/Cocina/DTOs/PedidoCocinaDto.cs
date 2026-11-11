@@ -7,8 +7,11 @@ public class PedidoCocinaDto
 {
     public int PedidoId { get; set; }
     public string MesaNumero { get; set; } = string.Empty;
+    public string SalonNombre { get; set; } = string.Empty;
     public string MozoNombre { get; set; } = string.Empty;
     public EstadoPedido EstadoPedido { get; set; }
+    /// <summary>Comentario general del pedido ("todo para llevar"), si lo tiene.</summary>
+    public string? Comentario { get; set; }
     public DateTime CreadoEn { get; set; }
     public DateTime? ActualizadoEn { get; set; }
     public List<ItemCocinaDto> Items { get; set; } = new();

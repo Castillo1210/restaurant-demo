@@ -15,13 +15,17 @@ public class DeleteMesaCommandHandler : IRequestHandler<DeleteMesaCommand, bool>
 
     public async Task<bool> Handle(DeleteMesaCommand request, CancellationToken cancellationToken)
     {
+        await using var tx = await _context.IniciarTransaccionAsync(cancellationToken);
+        await _context.BloquearMesaAsync(request.MesaId, cancellationToken);
+
         var mesa = await _context.Mesas
             .FirstOrDefaultAsync(m => m.MesaId == request.MesaId, cancellationToken)
             ?? throw new KeyNotFoundException($"Mesa {request.MesaId} no encontrada");
 
-        // Soft delete: cambiar estado a Mantenimiento
-        mesa.Estado = EstadoMesa.Mantenimiento;
+        // Soft delete: Mantenimiento (no se puede con un pedido abierto en la mesa).
+        mesa.Estado = await MesaOcupacion.EstadoAlEditarAsync(_context, mesa, EstadoMesa.Mantenimiento, cancellationToken);
         await _context.SaveChangesAsync(cancellationToken);
+        await tx.ConfirmarAsync(cancellationToken);
 
         return true;
     }

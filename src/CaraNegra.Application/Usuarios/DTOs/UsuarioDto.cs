@@ -12,6 +12,12 @@ public class UsuarioDto
     public bool EsVerificado { get; set; }
     public DateTime? UltimoAccesoEn { get; set; }
     public DateTime CreadoEn { get; set; }
+
+    /// <summary>Tiene PIN de ingreso rápido configurado (solo MOZO / COCINA).</summary>
+    public bool TienePin { get; set; }
+
+    /// <summary>Si el PIN está bloqueado por intentos fallidos, hasta cuándo (UTC).</summary>
+    public DateTime? PinBloqueadoHasta { get; set; }
 }
 
 public class CreateUsuarioDto
@@ -40,4 +46,4 @@ public class ResetPasswordDto
 {
     public string NewPassword { get; set; } = string.Empty;
     public string ConfirmPassword { get; set; } = string.Empty;
-}
+}

@@ -21,7 +21,7 @@ export const getMetodosPago = async () => {
     const { data } = await api.get('/metodos-pago', { params: { soloActivos: true } });
     return data.map(mapMetodoPago);
   } catch (error) {
-    console.error('Error al cargar métodos de pago:', getApiErrorMessage(error));
-    return [];
+    // Se lanza: un corte de red no debe verse como "no hay métodos de pago configurados".
+    throw new Error(getApiErrorMessage(error, 'No se pudieron cargar los métodos de pago'));
   }
 };

@@ -1,3 +1,4 @@
+@import "./tema.css";
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -9,7 +10,7 @@
 
   body {
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
-    @apply bg-background text-white antialiased;
+    @apply bg-background text-ink antialiased;
     overscroll-behavior: none;
   }
 }
@@ -28,20 +29,151 @@
   }
 }
 
-/* Comprobante de caja: al imprimir, solo se muestra el ticket (#recibo-imprimible),
-   nada más de la aplicación (mapa de mesas, modales, etc.). */
+/* ── Impresión de tickets (80 mm) ─────────────────────────────────────────
+   imprimirTicket() (utils/imprimir.js) copia el ticket a #zona-impresion, un hijo directo
+   de <body>. Al imprimir se OCULTA TODO lo demás con display:none (no visibility:hidden,
+   que dejaba el alto de la app y la ticketera avanzaba papel en blanco).
+   Térmicas: todo en negro puro y con trazo más grueso (los grises salen tenues o punteados). */
+#zona-impresion {
+  display: none;
+}
+
 @media print {
-  body * {
-    visibility: hidden;
+  @page {
+    margin: 0;
   }
-  #recibo-imprimible,
-  #recibo-imprimible * {
-    visibility: visible;
+  html,
+  body {
+    background: #fff !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
-  #recibo-imprimible {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
+  body.imprimiendo > *:not(#zona-impresion) {
+    display: none !important;
+  }
+  body.imprimiendo #zona-impresion {
+    display: block;
+  }
+  #zona-impresion .ticket {
+    width: 72mm; /* área imprimible de un rollo de 80 mm */
+    margin: 0;
+    padding: 1mm 1.5mm 0 1.5mm !important;
+    font-family: Arial, Helvetica, sans-serif !important;
+    font-size: 12.5px;
+    line-height: 1.25;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: #000 !important;
+    background: #fff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  #zona-impresion .ticket * {
+    color: #000 !important;
+    border-color: #000 !important;
+    box-shadow: none !important;
+  }
+  #zona-impresion .ticket .font-bold,
+  #zona-impresion .ticket .font-extrabold {
+    font-weight: 800;
+  }
+  #zona-impresion .ticket img.ticket-logo {
+    max-height: 16mm;
+    filter: grayscale(1) contrast(1.6);
+  }
+  #zona-impresion .ticket img.ticket-qr {
+    width: 26mm !important;
+    height: 26mm !important;
+  }
+  #zona-impresion .ticket-chico {
+    font-size: 11px;
+  }
+
+  /* Comanda impresa en caja (utils/comandaCaja.js): compacta, como la de cocina (sin líneas en blanco). */
+  #zona-impresion .ticket-comanda {
+    font-size: 13px;
+  }
+  #zona-impresion .ticket-comanda .tc-centro {
+    text-align: center;
+  }
+  #zona-impresion .ticket-comanda .tc-adicional {
+    text-align: center;
+    font-size: 15px;
+    font-weight: 800;
+  }
+  #zona-impresion .ticket-comanda .tc-mesa {
+    text-align: center;
+    font-size: 24px;
+    font-weight: 800;
+    line-height: 1.15;
+    margin: 0.5mm 0;
+  }
+  #zona-impresion .ticket-comanda .tc-fila {
+    display: flex;
+    justify-content: space-between;
+  }
+  #zona-impresion .ticket-comanda .tc-sep {
+    border-top: 2px dashed #000;
+    margin: 1.5mm 0;
+  }
+  #zona-impresion .ticket-comanda .tc-item {
+    display: flex;
+    gap: 1.5mm;
+    font-size: 15px;
+    font-weight: 800;
+    line-height: 1.2;
+    margin-top: 0.6mm; /* productos seguidos: ahorra papel */
+  }
+  #zona-impresion .ticket-comanda .tc-sep + .tc-item {
+    margin-top: 0;
+  }
+  /* En la anulación los platos van en letra normal: cocina solo tiene que reconocerlos. */
+  #zona-impresion .ticket-comanda .tc-item-normal {
+    font-size: 13px;
+  }
+  #zona-impresion .ticket-comanda .tc-cant {
+    flex-shrink: 0;
+    min-width: 9.5mm;
+  }
+  /* Nota de pedido (utils/precuenta.js): mismo formato que la cuenta previa que usaba el local. */
+  #zona-impresion .ticket-precuenta { font-size: 13px; font-weight: 500; }
+  #zona-impresion .ticket-precuenta .pc-centro { text-align: center; }
+  #zona-impresion .ticket-precuenta .pc-logo { display: block; margin: 0 auto 1.5mm; max-height: 22mm; max-width: 46mm; }
+  #zona-impresion .ticket-precuenta .pc-grande { font-size: 17px; font-weight: 800; margin-bottom: 1mm; }
+  #zona-impresion .ticket-precuenta .pc-mayus { text-transform: uppercase; font-size: 12px; line-height: 1.25; }
+  #zona-impresion .ticket-precuenta .pc-ruc { font-size: 14px; margin-top: 0.3mm; }
+  #zona-impresion .ticket-precuenta .pc-chico { font-size: 11px; }
+  #zona-impresion .ticket-precuenta .pc-fuerte { font-weight: 800; }
+  #zona-impresion .ticket-precuenta .pc-sep { border-top: 1.5px dashed #000; margin: 1.2mm 0; }
+  #zona-impresion .ticket-precuenta .pc-sep-corta { width: 60%; margin-left: auto; margin-right: auto; }
+  #zona-impresion .ticket-precuenta .pc-cliente { font-size: 14px; line-height: 1.35; margin-top: 1mm; }
+  #zona-impresion .ticket-precuenta .pc-fila { display: flex; justify-content: space-between; gap: 2mm; }
+  #zona-impresion .ticket-precuenta .pc-cabecera,
+  #zona-impresion .ticket-precuenta .pc-linea {
+    display: grid;
+    grid-template-columns: 11mm minmax(0, 1fr) 13mm 14mm;
+    gap: 1mm;
+    align-items: center;
+  }
+  #zona-impresion .ticket-precuenta .pc-cabecera { font-size: 13px; font-weight: 500; }
+  #zona-impresion .ticket-precuenta .pc-cabecera span:nth-child(n+3),
+  #zona-impresion .ticket-precuenta .pc-linea span:nth-child(n+3) { text-align: right; }
+  #zona-impresion .ticket-precuenta .pc-linea { font-size: 14px; line-height: 1.25; margin-top: 1mm; }
+  #zona-impresion .ticket-precuenta .pc-linea span:nth-child(2) { overflow-wrap: anywhere; }
+  #zona-impresion .ticket-precuenta .pc-total { font-size: 16px; font-weight: 800; margin-top: 0.5mm; }
+  #zona-impresion .ticket-precuenta .pc-orden { text-align: center; font-size: 13px; margin-top: 9mm; }
+
+  /* Comentario general del pedido: antes de los platos, destacado. */
+  #zona-impresion .ticket-comanda .tc-comentario {
+    font-size: 15px;
+    font-weight: 800;
+    line-height: 1.25;
+    margin: 1mm 0;
+    word-break: break-word;
+  }
+  #zona-impresion .ticket-comanda .tc-nota {
+    font-size: 13px;
+    font-weight: 800;
+    margin-left: 11mm;
   }
 }

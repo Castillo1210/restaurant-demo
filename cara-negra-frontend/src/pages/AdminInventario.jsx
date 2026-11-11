@@ -179,7 +179,7 @@ export default function AdminInventario() {
           whileTap={{ scale: 0.97 }}
           onClick={abrirFormNuevo}
           disabled={categoriasActivas.length === 0}
-          className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border border-dashed border-gray-700 text-gray-400 hover:text-white hover:border-primary/50 transition-colors font-semibold text-sm disabled:opacity-40"
+          className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border border-dashed border-gray-700 text-gray-400 hover:text-ink hover:border-primary/50 transition-colors font-semibold text-sm disabled:opacity-40"
         >
           <Plus size={16} />
           Nuevo artículo
@@ -206,27 +206,27 @@ export default function AdminInventario() {
               }`}
             >
               <div className="flex-1 min-w-0">
-                <p className="font-bold text-white text-sm truncate">{articulo.nombre}</p>
+                <p className="font-bold text-ink text-sm truncate">{articulo.nombre}</p>
                 <p className="text-xs text-gray-500 mt-0.5">{articulo.categoriaNombre} · {articulo.tipo}</p>
                 {!articulo.activo && (
                   <span className="inline-block text-[10px] font-bold text-gray-500 uppercase tracking-wider mt-1">Inactivo</span>
                 )}
               </div>
               <div className="text-right flex-shrink-0">
-                <p className="font-extrabold text-white text-sm">{articulo.stock} <span className="text-[10px] text-gray-500 font-normal">stock</span></p>
+                <p className="font-extrabold text-ink text-sm">{articulo.stock} <span className="text-[10px] text-gray-500 font-normal">stock</span></p>
                 <p className="text-xs text-gray-500">S/ {articulo.precio.toFixed(2)}</p>
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">
                 <button
                   onClick={() => abrirMovimientos(articulo)}
-                  className="p-2 hover:bg-cardHighlight rounded-full text-gray-500 hover:text-white transition-colors"
+                  className="p-2 hover:bg-cardHighlight rounded-full text-gray-500 hover:text-ink transition-colors"
                   title="Movimientos de stock"
                 >
                   <History size={15} />
                 </button>
                 <button
                   onClick={() => abrirFormEditar(articulo)}
-                  className="p-2 hover:bg-cardHighlight rounded-full text-gray-500 hover:text-white transition-colors"
+                  className="p-2 hover:bg-cardHighlight rounded-full text-gray-500 hover:text-ink transition-colors"
                   title="Editar"
                 >
                   <Pencil size={15} />
@@ -285,7 +285,7 @@ export default function AdminInventario() {
                     type="text" value={form.data.nombre} autoFocus
                     onChange={(e) => setForm({ ...form, data: { ...form.data, nombre: e.target.value } })}
                     placeholder="Ej: Pan de hamburguesa"
-                    className="w-full bg-background border border-gray-700/50 rounded-2xl px-4 py-3.5 text-white placeholder-gray-600 focus:outline-none focus:border-primary transition-colors text-sm"
+                    className="w-full bg-background border border-gray-700/50 rounded-2xl px-4 py-3.5 text-ink placeholder-gray-600 focus:outline-none focus:border-primary transition-colors text-sm"
                   />
                 </div>
                 <div>
@@ -293,7 +293,7 @@ export default function AdminInventario() {
                   <textarea
                     value={form.data.descripcion} rows={2}
                     onChange={(e) => setForm({ ...form, data: { ...form.data, descripcion: e.target.value } })}
-                    className="w-full bg-background border border-gray-700/50 rounded-2xl px-4 py-3.5 text-white placeholder-gray-600 focus:outline-none focus:border-primary transition-colors text-sm resize-none"
+                    className="w-full bg-background border border-gray-700/50 rounded-2xl px-4 py-3.5 text-ink placeholder-gray-600 focus:outline-none focus:border-primary transition-colors text-sm resize-none"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -304,7 +304,7 @@ export default function AdminInventario() {
                       <input
                         type="number" step="0.01" min="0" value={form.data.precio}
                         onChange={(e) => setForm({ ...form, data: { ...form.data, precio: e.target.value } })}
-                        className="w-full bg-background border border-gray-700/50 rounded-2xl pl-9 pr-3 py-3.5 text-white focus:outline-none focus:border-primary transition-colors text-sm"
+                        className="w-full bg-background border border-gray-700/50 rounded-2xl pl-9 pr-3 py-3.5 text-ink focus:outline-none focus:border-primary transition-colors text-sm"
                       />
                     </div>
                   </div>
@@ -314,7 +314,7 @@ export default function AdminInventario() {
                       type="text" list="tipos-articulo-sugeridos" value={form.data.tipo}
                       onChange={(e) => setForm({ ...form, data: { ...form.data, tipo: e.target.value } })}
                       placeholder="Ej: Insumo"
-                      className="w-full bg-background border border-gray-700/50 rounded-2xl px-4 py-3.5 text-white placeholder-gray-600 focus:outline-none focus:border-primary transition-colors text-sm"
+                      className="w-full bg-background border border-gray-700/50 rounded-2xl px-4 py-3.5 text-ink placeholder-gray-600 focus:outline-none focus:border-primary transition-colors text-sm"
                     />
                     <datalist id="tipos-articulo-sugeridos">
                       {TIPOS_SUGERIDOS.map((t) => <option key={t} value={t} />)}
@@ -326,7 +326,7 @@ export default function AdminInventario() {
                   <select
                     value={form.data.categoriaId}
                     onChange={(e) => setForm({ ...form, data: { ...form.data, categoriaId: Number(e.target.value) } })}
-                    className="w-full bg-background border border-gray-700/50 rounded-2xl px-4 py-3.5 text-white focus:outline-none focus:border-primary transition-colors text-sm"
+                    className="w-full bg-background border border-gray-700/50 rounded-2xl px-4 py-3.5 text-ink focus:outline-none focus:border-primary transition-colors text-sm"
                   >
                     <option value="" disabled>Selecciona una categoría</option>
                     {categoriasActivas.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
@@ -338,7 +338,7 @@ export default function AdminInventario() {
                     <input
                       type="number" min="0" value={form.data.stockInicial}
                       onChange={(e) => setForm({ ...form, data: { ...form.data, stockInicial: e.target.value } })}
-                      className="w-full bg-background border border-gray-700/50 rounded-2xl px-4 py-3.5 text-white focus:outline-none focus:border-primary transition-colors text-sm"
+                      className="w-full bg-background border border-gray-700/50 rounded-2xl px-4 py-3.5 text-ink focus:outline-none focus:border-primary transition-colors text-sm"
                     />
                     <p className="text-xs text-gray-600 mt-1.5">
                       Después de crear el artículo, el stock solo cambia registrando movimientos.
@@ -395,7 +395,7 @@ export default function AdminInventario() {
                         className={`py-2.5 rounded-xl text-xs font-bold transition-colors ${
                           form.data.tipoMovimiento === t
                             ? 'bg-primary text-white shadow-glow-orange'
-                            : 'bg-card text-gray-400 border border-gray-800/50 hover:text-white'
+                            : 'bg-card text-gray-400 border border-gray-800/50 hover:text-ink'
                         }`}
                       >
                         {t}
@@ -407,7 +407,7 @@ export default function AdminInventario() {
                       type="number" min="0" value={form.data.cantidad}
                       onChange={(e) => setForm({ ...form, data: { ...form.data, cantidad: e.target.value } })}
                       placeholder={form.data.tipoMovimiento === 'Ajuste' ? 'Nuevo stock exacto' : 'Cantidad'}
-                      className="w-full bg-card border border-gray-700/50 rounded-2xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-primary transition-colors text-sm"
+                      className="w-full bg-card border border-gray-700/50 rounded-2xl px-4 py-3 text-ink placeholder-gray-600 focus:outline-none focus:border-primary transition-colors text-sm"
                     />
                     {form.data.tipoMovimiento === 'Ajuste' && (
                       <p className="text-xs text-gray-600 mt-1.5">
@@ -419,13 +419,13 @@ export default function AdminInventario() {
                     type="text" value={form.data.referenciaCod}
                     onChange={(e) => setForm({ ...form, data: { ...form.data, referenciaCod: e.target.value } })}
                     placeholder="Referencia (opcional, ej. Nº de guía)"
-                    className="w-full bg-card border border-gray-700/50 rounded-2xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-primary transition-colors text-sm"
+                    className="w-full bg-card border border-gray-700/50 rounded-2xl px-4 py-3 text-ink placeholder-gray-600 focus:outline-none focus:border-primary transition-colors text-sm"
                   />
                   <input
                     type="text" value={form.data.notas}
                     onChange={(e) => setForm({ ...form, data: { ...form.data, notas: e.target.value } })}
                     placeholder="Notas (opcional)"
-                    className="w-full bg-card border border-gray-700/50 rounded-2xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-primary transition-colors text-sm"
+                    className="w-full bg-card border border-gray-700/50 rounded-2xl px-4 py-3 text-ink placeholder-gray-600 focus:outline-none focus:border-primary transition-colors text-sm"
                   />
                   <motion.button whileTap={{ scale: 0.97 }} type="submit" disabled={isSaving} className="w-full bg-primary hover:bg-primaryHover disabled:opacity-60 text-white font-bold py-3.5 rounded-2xl transition-all shadow-glow-orange text-sm">
                     {isSaving ? 'Guardando…' : 'Registrar movimiento'}

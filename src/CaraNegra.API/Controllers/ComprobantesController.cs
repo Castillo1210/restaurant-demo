@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using CaraNegra.Application.Common.Interfaces;
 using CaraNegra.Application.Comprobantes.Commands;
 using CaraNegra.Application.Comprobantes.DTOs;
 using CaraNegra.Application.Comprobantes.Queries;
@@ -10,8 +11,8 @@ using Microsoft.AspNetCore.Mvc;
 namespace CaraNegra.API.Controllers;
 
 /// <summary>
-/// Comprobantes electrónicos (boleta / factura). DEMO: la emisión es SIMULADA — se generan
-/// serie, correlativo, IGV y QR con el formato de SUNAT, pero no se envía nada a SUNAT/OSE.
+/// Comprobantes electrónicos (boleta / factura). Según FacturacionElectronica:Proveedor la
+/// emisión es simulada (demo) o se envía a APISUNAT (sandbox o producción).
 /// </summary>
 [ApiController]
 [Route("api/v{version:apiVersion}/comprobantes")]
@@ -20,8 +21,26 @@ namespace CaraNegra.API.Controllers;
 public class ComprobantesController : ControllerBase
 {
     private readonly IMediator _mediator;
+    private readonly IFacturacionElectronicaService _facturacion;
 
-    public ComprobantesController(IMediator mediator) => _mediator = mediator;
+    public ComprobantesController(IMediator mediator, IFacturacionElectronicaService facturacion)
+    {
+        _mediator = mediator;
+        _facturacion = facturacion;
+    }
+
+    /// <summary>Dónde se emiten los comprobantes (para los avisos de caja).</summary>
+    [HttpGet("ambiente")]
+    public IActionResult Ambiente() => Ok(new { proveedor = _facturacion.Proveedor, ambiente = _facturacion.Ambiente });
+
+    /// <summary>Número que llevará el próximo comprobante de una serie (ej. ?serie=B001 → B001-00000015).</summary>
+    [HttpGet("proximo-numero")]
+    public async Task<IActionResult> ProximoNumero([FromQuery] string serie) =>
+        Ok(await _mediator.Send(new GetProximoNumeroQuery(serie)));
+
+    /// <summary>Comprobantes emitidos hace más de una hora que SUNAT todavía no confirma (aviso en caja).</summary>
+    [HttpGet("atrasados")]
+    public async Task<IActionResult> Atrasados() => Ok(await _mediator.Send(new GetComprobantesAtrasadosQuery()));
 
     /// <summary>Listado de comprobantes por rango de fechas (calendario de Lima) y tipo.</summary>
     [HttpGet]
@@ -37,14 +56,7 @@ public class ComprobantesController : ControllerBase
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(int id)
     {
-        try
-        {
-            return Ok(await _mediator.Send(new GetComprobanteByIdQuery(id)));
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { mensaje = ex.Message });
-        }
+        return Ok(await _mediator.Send(new GetComprobanteByIdQuery(id)));
     }
 
     /// <summary>Comprobante vigente de un pedido (204 si todavía no tiene).</summary>
@@ -55,23 +67,22 @@ public class ComprobantesController : ControllerBase
         return result == null ? NoContent() : Ok(result);
     }
 
-    /// <summary>Emite (simula) la boleta o factura de un pedido ya pagado.</summary>
+    /// <summary>Emite la boleta o factura de un pedido ya pagado (y la envía al PSE si no es simulado).</summary>
     [HttpPost]
     public async Task<IActionResult> Emitir([FromBody] EmitirComprobanteDto dto)
     {
-        try
-        {
-            var usuarioId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-            var result = await _mediator.Send(new EmitirComprobanteCommand(dto, usuarioId));
-            return CreatedAtAction(nameof(GetById), new { id = result.ComprobanteId }, result);
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { mensaje = ex.Message });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { mensaje = ex.Message });
-        }
+        var usuarioId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        var result = await _mediator.Send(new EmitirComprobanteCommand(dto, usuarioId));
+        return CreatedAtAction(nameof(GetById), new { id = result.ComprobanteId }, result);
+    }
+
+    /// <summary>
+    /// Reintenta el envío (o consulta el estado) de un comprobante PorEnviar, Pendiente o con
+    /// error de envío, con el mismo número.
+    /// </summary>
+    [HttpPost("{id}/reenviar")]
+    public async Task<IActionResult> Reenviar(int id)
+    {
+        return Ok(await _mediator.Send(new ReenviarComprobanteCommand(id)));
     }
 }

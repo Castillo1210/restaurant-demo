@@ -1,4 +1,7 @@
+using CaraNegra.Application.Jornadas;
 using CaraNegra.Application.Common.Interfaces;
+using CaraNegra.Application.Comprobantes;
+using CaraNegra.Application.Mesas;
 using CaraNegra.Application.Pagos.DTOs;
 using CaraNegra.Domain.Entities;
 using CaraNegra.Domain.Enums;
@@ -25,21 +28,55 @@ public class AnularPagoCommandHandler : IRequestHandler<AnularPagoCommand, PagoD
         if (string.IsNullOrWhiteSpace(request.Motivo))
             throw new InvalidOperationException("Debe indicar un motivo para anular el pago");
 
+        // Bloqueo del pedido del pago (doble toque en "Anular" o cobro simultáneo).
+        await using var tx = await _context.IniciarTransaccionAsync(cancellationToken);
+        var pedidoDelPago = await _context.Pagos.AsNoTracking()
+            .Where(p => p.PagoId == request.PagoId)
+            .Select(p => (int?)p.PedidoId)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (pedidoDelPago is int idPedido)
+        {
+            await _context.BloquearJornadaAbiertaAsync(exclusivo: false, cancellationToken);
+            await _context.BloquearPedidoAsync(idPedido, cancellationToken);
+        }
+
         var pago = await _context.Pagos
             .Include(p => p.MetodoPago)
             .Include(p => p.Pedido)
-                .ThenInclude(p => p.Mesa)
+                .ThenInclude(p => p.Mesa).ThenInclude(m => m.Salon)
             .FirstOrDefaultAsync(p => p.PagoId == request.PagoId, cancellationToken)
             ?? throw new KeyNotFoundException($"Pago {request.PagoId} no encontrado");
 
         if (pago.EstaAnulado)
             throw new InvalidOperationException("Este pago ya fue anulado anteriormente");
 
+        // Una jornada cerrada (con su arqueo) es de solo lectura.
+        if (pago.JornadaId is int jornadaId)
+        {
+            var cerrada = await _context.Jornadas.AnyAsync(
+                j => j.JornadaId == jornadaId && j.Estado == EstadoJornada.Cerrada, cancellationToken);
+            if (cerrada)
+                throw new InvalidOperationException("El pago es de una jornada ya cerrada (con arqueo): no se puede anular");
+        }
+
         var pedido = pago.Pedido;
 
         // No permitir anular si el pedido está cancelado
         if (pedido.EstadoPedido == EstadoPedido.Cancelado)
             throw new InvalidOperationException("No se puede anular un pago de un pedido cancelado");
+
+        // Con boleta o factura válida, anular el pago dejaría en SUNAT un comprobante de una venta que
+        // ya no existe (o distinto de lo que se termine cobrando). Mientras no haya nota de crédito,
+        // no se permite. Un comprobante rechazado o con error no cuenta.
+        var comprobantes = await _context.Comprobantes.AsNoTracking()
+            .Where(c => c.PedidoId == pedido.PedidoId)
+            .Select(c => new { c.Estado, c.Serie, c.Correlativo })
+            .ToListAsync(cancellationToken);
+        var valido = comprobantes.FirstOrDefault(c => !ComprobanteEnvio.NoEsValido(c.Estado));
+        if (valido is not null)
+            throw new InvalidOperationException(
+                $"Este pedido ya tiene el comprobante {ComprobanteMapper.FormatearNumero(valido.Serie, valido.Correlativo)}: " +
+                "no se puede anular el pago (haría falta una nota de crédito).");
 
         var pedidoId = pedido.PedidoId;
         var mesaId = pedido.MesaId;
@@ -69,11 +106,7 @@ public class AnularPagoCommandHandler : IRequestHandler<AnularPagoCommand, PagoD
 
             // Ocupar mesa nuevamente
             var mesa = await _context.Mesas.FindAsync(new object[] { mesaId }, cancellationToken);
-            if (mesa != null && mesa.Estado != EstadoMesa.Ocupada)
-            {
-                mesa.Estado = EstadoMesa.Ocupada;
-                mesaReocupada = true;
-            }
+            mesaReocupada = MesaOcupacion.Ocupar(mesa);
         }
         else if (totalPagado == 0)
         {
@@ -85,6 +118,7 @@ public class AnularPagoCommandHandler : IRequestHandler<AnularPagoCommand, PagoD
         }
 
         await _context.SaveChangesAsync(cancellationToken);
+        await tx.ConfirmarAsync(cancellationToken);
 
         await _hub.NotificarPagoAnulado(new PagoAnuladoEvent
         {
@@ -100,6 +134,7 @@ public class AnularPagoCommandHandler : IRequestHandler<AnularPagoCommand, PagoD
             {
                 PedidoId = pedidoId,
                 MesaNumero = pago.Pedido?.Mesa?.NumeroMesa ?? string.Empty,
+                SalonNombre = pago.Pedido?.Mesa?.Salon?.Nombre ?? string.Empty,
                 EstadoAnterior = estadoAnteriorPedido.ToString(),
                 EstadoNuevo = pedido.EstadoPedido.ToString(),
                 ActualizadoEn = DateTime.UtcNow
@@ -138,4 +173,4 @@ public class AnularPagoCommandHandler : IRequestHandler<AnularPagoCommand, PagoD
             CreadoEn = pago.CreadoEn
         };
     }
-}
+}

@@ -50,7 +50,9 @@ public class GetUsuariosByRolQueryHandler : IRequestHandler<GetUsuariosByRolQuer
             RolNombre = u.Rol?.Nombre ?? string.Empty,
             EsVerificado = u.EsVerificado,
             UltimoAccesoEn = u.UltimoAccesoEn,
-            CreadoEn = u.CreadoEn
+            CreadoEn = u.CreadoEn,
+            TienePin = u.PinHash != null,
+            PinBloqueadoHasta = u.PinBloqueadoHasta > DateTime.UtcNow ? u.PinBloqueadoHasta : null
         };
     }
-}
+}

@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Key, LogOut, ChevronLeft, Eye, EyeOff } from 'lucide-react';
+import { X, Key, LogOut, ChevronLeft, Eye, EyeOff, Sun, Moon, PanelLeft, PanelRight, BookOpen } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { cambiarPassword } from '../services/authService';
 import toast from 'react-hot-toast';
+import { getTema, setTema } from '../utils/tema';
+import { getLadoPanel, setLadoPanel } from '../utils/ladoPanel';
+import useMediaQuery from '../hooks/useMediaQuery';
 
 // ─── Variantes definidas FUERA del componente para evitar recreaciones ──────
 const overlayVariants = {
@@ -28,6 +31,10 @@ const slideVariants = {
 };
 
 export default function UserSettingsModal({ onClose }) {
+  const [tema, setTemaActual] = useState(getTema);
+  const elegirTema = (t) => setTemaActual(setTema(t));
+  const [ladoPanel, setLadoPanelActual] = useState(getLadoPanel);
+  const esMonitor = useMediaQuery('(min-width: 1024px)');
   const navigate = useNavigate();
   const { user, logout } = useAuth();
 
@@ -122,7 +129,7 @@ export default function UserSettingsModal({ onClose }) {
                   {initial}
                 </div>
                 <div>
-                  <h2 className="text-lg font-extrabold text-white">{user?.nombreCompleto}</h2>
+                  <h2 className="text-lg font-extrabold text-ink">{user?.nombreCompleto}</h2>
                   <p className="text-xs text-gray-500">@{user?.nombreUsuario} · {user?.rol}</p>
                 </div>
               </div>
@@ -136,6 +143,79 @@ export default function UserSettingsModal({ onClose }) {
                   <Key size={17} className="text-gray-500 group-hover:text-primary transition-colors" />
                   <span className="text-sm font-medium text-gray-200">Cambiar contraseña</span>
                 </motion.button>
+
+                {/* Guías interactivas (archivos estáticos en public/): cada rol ve la suya; el admin, ambas. */}
+                {[
+                  { href: '/guia-admin.html', texto: 'Guía del administrador', roles: ['ADMIN'] },
+                  { href: '/guia-mozo.html', texto: 'Guía rápida del mozo', roles: ['MOZO', 'ADMIN'] },
+                  { href: '/guia-cajero.html', texto: 'Guía rápida del cajero', roles: ['CAJERO', 'ADMIN'] },
+                ]
+                  .filter((g) => g.roles.includes(user?.rol))
+                  .map((g) => (
+                    <a
+                      key={g.href}
+                      href={g.href}
+                      target="_blank"
+                      rel="noopener"
+                      className="w-full flex items-center gap-3 p-3.5 bg-background rounded-2xl hover:bg-cardHighlight transition-colors group border border-gray-800/40"
+                    >
+                      <BookOpen size={17} className="text-gray-500 group-hover:text-primary transition-colors" />
+                      <span className="text-sm font-medium text-gray-200">{g.texto}</span>
+                    </a>
+                  ))}
+
+                {/* Apariencia: se guarda en este equipo (p. ej. la TV de cocina puede quedar en oscuro). */}
+                <div className="p-3.5 bg-background rounded-2xl border border-gray-800/40">
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Apariencia en este equipo</p>
+                  <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Tema">
+                    {[
+                      { id: 'claro', label: 'Claro', Icono: Sun },
+                      { id: 'oscuro', label: 'Oscuro', Icono: Moon },
+                    ].map(({ id, label, Icono }) => (
+                      <button
+                        key={id}
+                        type="button"
+                        role="radio"
+                        aria-checked={tema === id}
+                        onClick={() => elegirTema(id)}
+                        className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold border transition-colors ${
+                          tema === id
+                            ? 'bg-primary/15 border-primary text-primary'
+                            : 'bg-card border-gray-700/40 text-gray-400 hover:text-ink'
+                        }`}
+                      >
+                        <Icono size={16} /> {label}
+                      </button>
+                    ))}
+                  </div>
+                  {/* Solo en pantallas grandes (monitor de caja): de qué lado va el listado del pedido */}
+                  {esMonitor && (
+                    <>
+                      <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mt-3 mb-2">Listado del pedido junto a la carta</p>
+                      <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Lado del listado del pedido">
+                        {[
+                          { id: 'izquierda', label: 'Izquierda', Icono: PanelLeft },
+                          { id: 'derecha', label: 'Derecha', Icono: PanelRight },
+                        ].map(({ id, label, Icono }) => (
+                          <button
+                            key={id}
+                            type="button"
+                            role="radio"
+                            aria-checked={ladoPanel === id}
+                            onClick={() => setLadoPanelActual(setLadoPanel(id))}
+                            className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold border transition-colors ${
+                              ladoPanel === id
+                                ? 'bg-primary/15 border-primary text-primary'
+                                : 'bg-card border-gray-700/40 text-gray-400 hover:text-ink'
+                            }`}
+                          >
+                            <Icono size={16} /> {label}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
 
                 <div className="h-px bg-gray-800/60 my-1" />
 
@@ -175,7 +255,7 @@ export default function UserSettingsModal({ onClose }) {
               </button>
 
               <div className="mt-8 mb-6 text-center">
-                <h2 className="text-xl font-extrabold text-white">Cambiar contraseña</h2>
+                <h2 className="text-xl font-extrabold text-ink">Cambiar contraseña</h2>
                 <p className="text-xs text-gray-500 mt-1">Debe tener al menos 6 caracteres</p>
               </div>
 
@@ -190,7 +270,7 @@ export default function UserSettingsModal({ onClose }) {
                       type={showCurrent ? 'text' : 'password'}
                       value={passwordForm.current}
                       onChange={(e) => setPasswordForm({ ...passwordForm, current: e.target.value })}
-                      className="w-full bg-background border border-gray-700/50 rounded-2xl px-4 py-3.5 text-white placeholder-gray-600 focus:outline-none focus:border-primary transition-colors text-sm"
+                      className="w-full bg-background border border-gray-700/50 rounded-2xl px-4 py-3.5 text-ink placeholder-gray-600 focus:outline-none focus:border-primary transition-colors text-sm"
                       placeholder="••••••••"
                     />
                     <button type="button" onClick={() => setShowCurrent((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300">
@@ -206,7 +286,7 @@ export default function UserSettingsModal({ onClose }) {
                       type={showNew ? 'text' : 'password'}
                       value={passwordForm.next}
                       onChange={(e) => setPasswordForm({ ...passwordForm, next: e.target.value })}
-                      className="w-full bg-background border border-gray-700/50 rounded-2xl px-4 py-3.5 text-white placeholder-gray-600 focus:outline-none focus:border-primary transition-colors text-sm"
+                      className="w-full bg-background border border-gray-700/50 rounded-2xl px-4 py-3.5 text-ink placeholder-gray-600 focus:outline-none focus:border-primary transition-colors text-sm"
                       placeholder="••••••••"
                     />
                     <button type="button" onClick={() => setShowNew((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300">
@@ -221,7 +301,7 @@ export default function UserSettingsModal({ onClose }) {
                     type="password"
                     value={passwordForm.confirm}
                     onChange={(e) => setPasswordForm({ ...passwordForm, confirm: e.target.value })}
-                    className="w-full bg-background border border-gray-700/50 rounded-2xl px-4 py-3.5 text-white placeholder-gray-600 focus:outline-none focus:border-primary transition-colors text-sm"
+                    className="w-full bg-background border border-gray-700/50 rounded-2xl px-4 py-3.5 text-ink placeholder-gray-600 focus:outline-none focus:border-primary transition-colors text-sm"
                     placeholder="••••••••"
                   />
                 </div>

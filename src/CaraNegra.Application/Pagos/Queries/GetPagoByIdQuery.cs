@@ -18,7 +18,7 @@ public class GetPagoByIdQueryHandler : IRequestHandler<GetPagoByIdQuery, PagoDto
         var pago = await _context.Pagos
             .Include(p => p.MetodoPago)
             .Include(p => p.Pedido)
-                .ThenInclude(p => p.Mesa)
+                .ThenInclude(p => p.Mesa).ThenInclude(m => m.Salon)
             .FirstOrDefaultAsync(p => p.PagoId == request.PagoId, cancellationToken)
             ?? throw new KeyNotFoundException($"Pago {request.PagoId} no encontrado");
 

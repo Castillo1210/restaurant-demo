@@ -24,6 +24,9 @@ public class UpdateUsuarioCommandHandler : IRequestHandler<UpdateUsuarioCommand,
             .FirstOrDefaultAsync(r => r.RolId == request.Dto.RolId, cancellationToken)
             ?? throw new KeyNotFoundException($"Rol {request.Dto.RolId} no encontrado");
 
+        await UsuarioReglas.ExigirOtroAdminActivoSiDejaDeSerloAsync(_context, usuario,
+            seguiraSiendoAdmin: rol.Nombre == UsuarioReglas.RolAdmin, seguiraActivo: request.Dto.EsVerificado, cancellationToken);
+
         usuario.NombreCompleto = request.Dto.NombreCompleto;
         usuario.RolId = rol.RolId;
         usuario.EsVerificado = request.Dto.EsVerificado;

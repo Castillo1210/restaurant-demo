@@ -7,6 +7,7 @@ public class ComprobanteDto
     public int ComprobanteId { get; set; }
     public int PedidoId { get; set; }
     public string MesaNumero { get; set; } = string.Empty;
+    public string SalonNombre { get; set; } = string.Empty;
 
     public TipoComprobante TipoComprobante { get; set; }
     /// <summary>Código SUNAT del tipo: "03" boleta, "01" factura.</summary>
@@ -34,6 +35,15 @@ public class ComprobanteDto
     public EstadoComprobante Estado { get; set; }
     public bool EsSimulacion { get; set; }
 
+    /// <summary>SIMULADO, SANDBOX o PRODUCCION.</summary>
+    public string Ambiente { get; set; } = "SIMULADO";
+    /// <summary>Último mensaje del proveedor / SUNAT (motivo de rechazo o error).</summary>
+    public string? MensajeSunat { get; set; }
+    public string? XmlUrl { get; set; }
+    public string? CdrUrl { get; set; }
+    /// <summary>PDF (ticket) generado por el proveedor.</summary>
+    public string? PdfUrl { get; set; }
+
     public string AtendidoPor { get; set; } = string.Empty;
     public string EmitidoPor { get; set; } = string.Empty;
 
@@ -49,6 +59,9 @@ public class EmisorDto
     public string NombreComercial { get; set; } = string.Empty;
     public string Direccion { get; set; } = string.Empty;
     public string? Telefono { get; set; }
+    public string? Email { get; set; }
+    public string? LogoBase64 { get; set; }
+    public string? MensajePie { get; set; }
 }
 
 public class ComprobanteItemDto

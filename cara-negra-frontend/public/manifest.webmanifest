@@ -1,7 +1,7 @@
 {
-  "name": "Cara Negra — Gestión de sala",
-  "short_name": "Cara Negra",
-  "description": "Gestión de mesas, pedidos, caja e inventario para Cara Negra",
+  "name": "Gestión de sala",
+  "short_name": "Sala",
+  "description": "Gestión de mesas, pedidos, cocina, caja y comprobantes",
   "start_url": "/dashboard",
   "scope": "/",
   "display": "standalone",

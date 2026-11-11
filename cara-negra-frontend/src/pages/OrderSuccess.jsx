@@ -4,6 +4,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, ArrowLeft, Printer, Eye, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { reimprimirComanda, previsualizarComanda } from '../services/ordersService';
+import { etiquetaMesa } from '../utils/mesaLabel';
+import { useAuth } from '../context/AuthContext';
+import { useEmpresa } from '../context/EmpresaContext';
+import { imprimirComandaEnCaja } from '../utils/comandaCaja';
 
 export default function OrderSuccess() {
   const navigate = useNavigate();
@@ -13,8 +17,21 @@ export default function OrderSuccess() {
   const [comandaPreview, setComandaPreview] = useState(null); // texto o null si el modal está cerrado
   const timerRef = useRef(null);
 
+  const { user } = useAuth();
+  const { nombreComercial } = useEmpresa();
+  // El cajero (y el admin) toma pedidos desde la caja: puede imprimir la comanda también en la
+  // ticketera de boletas. En cocina sale igual que siempre.
+  // Admin y cajero: la comanda ya salió sola en la ticketera de este equipo; el botón la repite.
+  const puedeImprimirEnCaja = ['CAJERO', 'ADMIN'].includes(user?.rol) && state?.comandaCaja?.items?.length > 0;
+
+  const handleImprimirEnCaja = () => {
+    clearTimeout(timerRef.current);
+    imprimirComandaEnCaja({ ...state.comandaCaja, nombreComercial });
+  };
+
   const pedidoId = state?.pedidoId ?? '—';
   const mesaNumero = state?.mesaNumero;
+  const salonNombre = state?.salonNombre;
 
   // Auto-redirigir al dashboard después de 10 s (se cancela si se abre la
   // previsualización de la comanda, para no interrumpir una demo al cliente).
@@ -79,12 +96,12 @@ export default function OrderSuccess() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.35 }}
         >
-          <h1 className="text-2xl font-extrabold text-white mb-2 tracking-tight">
+          <h1 className="text-2xl font-extrabold text-ink mb-2 tracking-tight">
             ¡Pedido enviado!
           </h1>
           <p className="text-gray-500 text-sm leading-relaxed">
             {mesaNumero
-              ? `La comanda de la Mesa ${mesaNumero} ha sido enviada a cocina.`
+              ? `La comanda de ${etiquetaMesa(salonNombre, mesaNumero)} ha sido enviada a cocina.`
               : 'La comanda ha sido enviada a cocina correctamente.'}
           </p>
         </motion.div>
@@ -109,10 +126,25 @@ export default function OrderSuccess() {
           </motion.p>
           {mesaNumero && (
             <p className="text-sm text-gray-400">
-              Mesa {mesaNumero} · En preparación
+              {etiquetaMesa(salonNombre, mesaNumero)} · En preparación
             </p>
           )}
         </motion.div>
+
+        {/* Comanda en la ticketera de caja (cajero / admin) */}
+        {puedeImprimirEnCaja && (
+          <motion.button
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.55 }}
+            whileTap={{ scale: 0.96 }}
+            onClick={handleImprimirEnCaja}
+            className="w-full bg-primary hover:bg-primaryHover text-white font-bold py-3.5 rounded-2xl flex items-center justify-center gap-2 transition-colors mb-3 shadow-glow-orange"
+          >
+            <Printer size={18} />
+            Imprimir otra vez la comanda
+          </motion.button>
+        )}
 
         {/* Reimprimir comanda */}
         <motion.button
@@ -122,10 +154,10 @@ export default function OrderSuccess() {
           whileTap={{ scale: 0.96 }}
           onClick={handleReimprimir}
           disabled={reimprimiendo}
-          className="w-full bg-card border border-gray-700/40 hover:bg-cardHighlight text-white font-bold py-3.5 rounded-2xl flex items-center justify-center gap-2 transition-colors mb-3 disabled:opacity-50"
+          className="w-full bg-card border border-gray-700/40 hover:bg-cardHighlight text-ink font-bold py-3.5 rounded-2xl flex items-center justify-center gap-2 transition-colors mb-3 disabled:opacity-50"
         >
           <Printer size={18} />
-          {reimprimiendo ? 'Reimprimiendo…' : 'Reimprimir comanda'}
+          {reimprimiendo ? 'Reimprimiendo…' : 'Reimprimir comanda en cocina'}
         </motion.button>
 
         {/* Ver formato de comanda (previsualización, sin imprimir de verdad) */}
@@ -136,7 +168,7 @@ export default function OrderSuccess() {
           whileTap={{ scale: 0.96 }}
           onClick={handleVerComanda}
           disabled={cargandoPreview}
-          className="w-full bg-card border border-gray-700/40 hover:bg-cardHighlight text-white font-bold py-3.5 rounded-2xl flex items-center justify-center gap-2 transition-colors mb-3 disabled:opacity-50"
+          className="w-full bg-card border border-gray-700/40 hover:bg-cardHighlight text-ink font-bold py-3.5 rounded-2xl flex items-center justify-center gap-2 transition-colors mb-3 disabled:opacity-50"
         >
           <Eye size={18} />
           {cargandoPreview ? 'Cargando…' : 'Ver formato de comanda'}
@@ -149,7 +181,7 @@ export default function OrderSuccess() {
           transition={{ delay: 0.7 }}
           whileTap={{ scale: 0.96 }}
           onClick={() => navigate('/dashboard')}
-          className="w-full bg-card border border-gray-700/40 hover:bg-cardHighlight text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 transition-colors"
+          className="w-full bg-card border border-gray-700/40 hover:bg-cardHighlight text-ink font-bold py-4 rounded-2xl flex items-center justify-center gap-2 transition-colors"
         >
           <ArrowLeft size={18} />
           Volver al mapa de mesas
@@ -182,7 +214,7 @@ export default function OrderSuccess() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.94 }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-sm bg-white text-black rounded-3xl overflow-hidden shadow-2xl flex flex-col"
+              className="paleta-normal w-full max-w-sm bg-white text-black rounded-3xl overflow-hidden shadow-2xl flex flex-col"
               style={{ maxHeight: '85dvh' }}
             >
               <div className="px-5 pt-5 pb-3 flex justify-between items-center border-b border-dashed border-gray-300 flex-shrink-0">

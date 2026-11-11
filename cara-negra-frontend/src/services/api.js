@@ -41,9 +41,16 @@ export const setStoredAuth = (auth) => {
 
 export const AUTH_STORAGE_KEY = AUTH_KEY;
 
+// Tiempo máximo de espera por petición. Sin esto, con el Wi-Fi caído una petición puede quedar
+// colgada indefinidamente y el botón se queda en "Enviando...". Emitir comprobantes usa más
+// (ver comprobantesService): espera la respuesta de SUNAT.
+export const TIMEOUT_MS = 20000;
+export const TIMEOUT_SUNAT_MS = 60000;
+
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
+  timeout: TIMEOUT_MS,
 });
 
 api.interceptors.request.use((config) => {
@@ -82,8 +89,37 @@ api.interceptors.response.use(
  */
 export const getApiErrorMessage = (error, fallback = 'Ocurrió un error inesperado. Intenta de nuevo.') => {
   if (error?.response?.data?.mensaje) return error.response.data.mensaje;
+
+  // Errores de validación (FluentValidation / model binding): { errors: { Campo: ["msg", ...] } }.
+  // Antes se mostraba solo el título genérico ("One or more validation errors occurred"), sin
+  // decir QUÉ campo falló; ahora se muestran los mensajes concretos.
+  const errores = error?.response?.data?.errors;
+  if (errores && typeof errores === 'object') {
+    const mensajes = Object.entries(errores)
+      // "The dto field is required" es un efecto secundario del error real de conversión: se omite.
+      .filter(([campo]) => !/^(dto|request)$/i.test(campo))
+      .flatMap(([campo, lista]) =>
+      (Array.isArray(lista) ? lista : [lista]).map((m) =>
+        // Error de conversión de tipos (p.ej. un número llegó vacío): se muestra algo entendible.
+        /could not be converted|is required|field is required/i.test(String(m))
+          ? `Dato inválido en "${campo.replace(/^\$\./, '')}"`
+          : String(m)
+      )
+    );
+    const unicos = [...new Set(mensajes)].filter(Boolean);
+    if (unicos.length) return unicos.slice(0, 3).join(' · ');
+  }
+
+  // Errores manejados por el middleware del servidor: { title, detail } (p. ej. 409 "otra
+  // persona está trabajando sobre este pedido"). El detalle es el mensaje útil.
+  const status = error?.response?.status;
+  if (status && status < 500 && error?.response?.data?.detail) return error.response.data.detail;
+
   if (error?.response?.data?.title) return error.response.data.title;
-  if (error?.message === 'Network Error') return 'No se pudo conectar con el servidor.';
+  if (error?.code === 'ECONNABORTED' || error?.code === 'ETIMEDOUT') {
+    return 'El servidor tardó demasiado en responder (¿Wi-Fi lento?). Antes de repetir, revisa si la operación sí se registró.';
+  }
+  if (error?.message === 'Network Error') return 'No se pudo conectar con el servidor. Revisa el Wi-Fi.';
   return fallback;
 };
 

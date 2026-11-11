@@ -13,12 +13,13 @@ namespace CaraNegra.Application.Comprobantes.Commands;
 public record EmitirComprobanteCommand(EmitirComprobanteDto Dto, int UsuarioId) : IRequest<ComprobanteDto>;
 
 /// <summary>
-/// Emite (SIMULA) un comprobante electrónico para un pedido ya pagado por completo.
+/// Emite el comprobante electrónico de un pedido ya pagado por completo.
 ///
-/// Genera todo lo que tendría un comprobante real — serie y correlativo propios por tipo,
-/// base imponible e IGV, hash y cadena QR — pero NO firma el XML ni lo envía a SUNAT/OSE.
-/// El estado queda como "AceptadoSimulado" para imitar la respuesta de SUNAT en la demo.
-/// Para pasar a producción, este handler es el punto donde se integraría el proveedor OSE/PSE.
+/// Siempre reserva primero la serie-correlativo y guarda el comprobante (nunca se pierde un
+/// número ni se bloquea la venta). Luego, según el proveedor configurado:
+///   - "Simulado": queda "AceptadoSimulado" con un hash de ejemplo (demo, sin envío a SUNAT).
+///   - "ApiSunat": se envía al PSE (sandbox o producción) y se guarda su respuesta: Aceptado,
+///     Pendiente, Rechazado, ErrorEnvio o PorEnviar (sin conexión, se reintenta solo).
 /// </summary>
 public class EmitirComprobanteCommandHandler : IRequestHandler<EmitirComprobanteCommand, ComprobanteDto>
 {
@@ -26,17 +27,30 @@ public class EmitirComprobanteCommandHandler : IRequestHandler<EmitirComprobante
     private const decimal MontoMaximoBoletaSinDocumento = 700m;
 
     private readonly IApplicationDbContext _context;
-    private readonly DatosEmpresa _empresa;
+    private readonly IDatosEmpresaProvider _empresaProvider;
+    private readonly IFacturacionElectronicaService _facturacion;
+    private DatosEmpresa _empresa = new();
 
-    public EmitirComprobanteCommandHandler(IApplicationDbContext context, DatosEmpresa empresa)
+    public EmitirComprobanteCommandHandler(IApplicationDbContext context, IDatosEmpresaProvider empresaProvider,
+        IFacturacionElectronicaService facturacion)
     {
         _context = context;
-        _empresa = empresa;
+        _empresaProvider = empresaProvider;
+        _facturacion = facturacion;
     }
 
     public async Task<ComprobanteDto> Handle(EmitirComprobanteCommand request, CancellationToken cancellationToken)
     {
         var dto = request.Dto;
+
+        // Doble toque en "Emitir" o dos cajas sobre el mismo pedido: el pedido se bloquea y la
+        // segunda petición espera; al continuar encuentra el comprobante de la primera y se
+        // rechaza. Así nunca salen dos boletas (dos envíos a SUNAT) para un mismo consumo.
+        // El bloqueo dura solo hasta guardar el número; el envío al PSE va después, sin bloqueo.
+        await using var tx = await _context.IniciarTransaccionAsync(cancellationToken);
+        await _context.BloquearPedidoAsync(dto.PedidoId, cancellationToken);
+
+        _empresa = await _empresaProvider.ObtenerAsync(cancellationToken);
 
         var pedido = await _context.Pedidos
             .Include(p => p.Pagos)
@@ -46,8 +60,12 @@ public class EmitirComprobanteCommandHandler : IRequestHandler<EmitirComprobante
         if (pedido.EstadoPedido != EstadoPedido.Entregado)
             throw new InvalidOperationException("Solo se puede emitir el comprobante de un pedido pagado por completo");
 
+        // Un comprobante rechazado por SUNAT o con error de envío no cuenta: se puede emitir otro.
         var existente = await _context.Comprobantes
-            .Where(c => c.PedidoId == pedido.PedidoId && c.Estado != EstadoComprobante.Anulado)
+            .Where(c => c.PedidoId == pedido.PedidoId
+                && c.Estado != EstadoComprobante.Anulado
+                && c.Estado != EstadoComprobante.Rechazado
+                && c.Estado != EstadoComprobante.ErrorEnvio)
             .Select(c => new { c.Serie, c.Correlativo })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -97,21 +115,35 @@ public class EmitirComprobanteCommandHandler : IRequestHandler<EmitirComprobante
             Descuento = descuento,
             Total = total,
             FechaEmision = DateTime.UtcNow,
-            Estado = EstadoComprobante.AceptadoSimulado,
-            EsSimulacion = true
+            EmisorRuc = _empresa.Ruc,
+            EmisorRazonSocial = _empresa.RazonSocial,
+            EmisorNombreComercial = _empresa.NombreComercial,
+            EmisorDireccion = _empresa.Direccion,
+            IgvPorcentaje = _empresa.IgvPorcentaje,
+            Estado = _facturacion.EsSimulado ? EstadoComprobante.AceptadoSimulado : EstadoComprobante.PorEnviar,
+            // Marca de "en envío": el reintento automático no lo toca durante el primer minuto, para no
+            // mandarlo dos veces a la vez con el envío que hace la caja enseguida.
+            UltimoEnvioEn = _facturacion.EsSimulado ? null : DateTime.UtcNow,
+            Ambiente = _facturacion.Ambiente,
+            EsSimulacion = _facturacion.Ambiente != "PRODUCCION"
         };
+
+        // Registrar / actualizar el cliente en la base local (si se identificó con documento),
+        // así la próxima compra se autocompleta sin consultar la API externa.
+        await CaraNegra.Application.Clientes.ClienteRegistro.GuardarAsync(
+            _context, tipoDoc, numeroDoc, nombre, cancellationToken,
+            direccion: tipoDoc == TipoDocumentoIdentidad.RUC ? dto.ClienteDireccion : null);
 
         // Correlativo por serie. El índice único (Serie, Correlativo) protege contra dos cajas
         // emitiendo a la vez: si choca, se recalcula y se reintenta.
         const int maxIntentos = 3;
         for (var intento = 1; ; intento++)
         {
-            var ultimo = await _context.Comprobantes
-                .Where(c => c.Serie == serie)
-                .MaxAsync(c => (int?)c.Correlativo, cancellationToken) ?? 0;
+            var ultimo = await Numeracion.UltimoAsync(_context, _facturacion, serie, cancellationToken);
 
             comprobante.Correlativo = ultimo + 1;
-            comprobante.HashResumen = CalcularHash(comprobante);
+            // El hash real (DigestValue de la firma) lo devuelve el proveedor; en la demo se usa uno de ejemplo.
+            comprobante.HashResumen = _facturacion.EsSimulado ? CalcularHash(comprobante) : string.Empty;
 
             if (intento == 1) _context.Comprobantes.Add(comprobante);
 
@@ -123,11 +155,22 @@ public class EmitirComprobanteCommandHandler : IRequestHandler<EmitirComprobante
             catch (DbUpdateException) when (intento < maxIntentos)
             {
                 // Otro comprobante tomó el mismo correlativo: reintentar con el siguiente.
+                // (READ COMMITTED: el MAX de arriba ya ve el número que tomó la otra caja.)
             }
         }
+        await tx.ConfirmarAsync(cancellationToken);
 
         var creado = await ComprobanteQueries.ConDetalle(_context)
             .FirstAsync(c => c.ComprobanteId == comprobante.ComprobanteId, cancellationToken);
+
+        // Envío al PSE. El número ya quedó guardado: si esto falla o no hay internet, el comprobante
+        // queda "PorEnviar" y el proceso automático lo reintenta.
+        if (!_facturacion.EsSimulado)
+        {
+            await ComprobanteEnvio.ProcesarAsync(creado, _facturacion, cancellationToken,
+                async ct => await _context.SaveChangesAsync(ct));
+            await _context.SaveChangesAsync(cancellationToken);
+        }
 
         return ComprobanteMapper.ToDto(creado, _empresa);
     }

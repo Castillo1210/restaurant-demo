@@ -25,7 +25,7 @@ public class GetAllPagosQueryHandler : IRequestHandler<GetAllPagosQuery, PagedRe
         var query = _context.Pagos
             .Include(p => p.MetodoPago)
             .Include(p => p.Pedido)
-                .ThenInclude(p => p.Mesa)
+                .ThenInclude(p => p.Mesa).ThenInclude(m => m.Salon)
             .AsQueryable();
 
         if (request.FechaDesde.HasValue)

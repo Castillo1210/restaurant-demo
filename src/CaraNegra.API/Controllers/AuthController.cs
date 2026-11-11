@@ -24,15 +24,8 @@ public class AuthController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
-        try
-        {
-            var response = await _mediator.Send(new LoginCommand(request));
-            return Ok(response);
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            return Unauthorized(new { mensaje = ex.Message });
-        }
+        var response = await _mediator.Send(new LoginCommand(request));
+        return Ok(response);
     }
 
     /// <summary>
@@ -43,14 +36,7 @@ public class AuthController : ControllerBase
     [Authorize(Roles = "ADMIN")]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request)
     {
-        try
-        {
-            var mensaje = await _mediator.Send(new RegisterCommand(request));
-            return Ok(new { mensaje });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { mensaje = ex.Message });
-        }
+        var mensaje = await _mediator.Send(new RegisterCommand(request));
+        return Ok(new { mensaje });
     }
 }

@@ -40,7 +40,8 @@ public class CreateProductoCommandHandler : IRequestHandler<CreateProductoComman
             Tipo = producto.Tipo,
             CategoriaId = producto.CategoriaId,
             CategoriaNombre = categoria?.Nombre ?? string.Empty,
+            ImagenVersion = producto.ImagenVersion,
             CreadoEn = producto.CreadoEn
         };
     }
-}
+}

@@ -24,15 +24,18 @@ const mapPago = (p) => ({
  * Registra un cobro sobre un pedido. Soporta pagos parciales/mixtos:
  * si el monto no cubre el saldo total, el pedido queda igual de "Listo"
  * hasta que se complete con más pagos.
- * @param {{ pedidoId: number, monto: number, metodoPagoId: number, referencia?: string }} payload
+ * `operacionId` identifica ESTE cobro: si la respuesta se pierde (Wi-Fi) y el cajero reintenta con
+ * el mismo código, el servidor devuelve el pago ya registrado en vez de cobrar dos veces.
+ * @param {{ pedidoId: number, monto: number, metodoPagoId: number, referencia?: string, operacionId?: string }} payload
  */
-export const createPago = async ({ pedidoId, monto, metodoPagoId, referencia }) => {
+export const createPago = async ({ pedidoId, monto, metodoPagoId, referencia, operacionId }) => {
   try {
     const { data } = await api.post('/pagos', {
       pedidoId,
       monto,
       metodoPagoId,
       referencia: referencia || null,
+      operacionId: operacionId || null,
     });
     return mapPago(data);
   } catch (error) {

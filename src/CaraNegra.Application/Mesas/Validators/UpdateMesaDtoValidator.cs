@@ -17,5 +17,8 @@ public class UpdateMesaDtoValidator : AbstractValidator<UpdateMesaDto>
 
         RuleFor(x => x.Estado)
             .IsInEnum().WithMessage("El estado de la mesa no es válido");
+
+        RuleFor(x => x.SalonId)
+            .GreaterThan(0).WithMessage("Seleccione el salón al que pertenece la mesa");
     }
 }

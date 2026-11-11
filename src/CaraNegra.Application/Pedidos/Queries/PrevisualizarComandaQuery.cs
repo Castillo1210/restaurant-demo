@@ -26,7 +26,7 @@ public class PrevisualizarComandaQueryHandler : IRequestHandler<PrevisualizarCom
     public async Task<string> Handle(PrevisualizarComandaQuery request, CancellationToken cancellationToken)
     {
         var pedido = await _context.Pedidos
-            .Include(p => p.Mesa)
+            .Include(p => p.Mesa).ThenInclude(m => m.Salon)
             .Include(p => p.Usuario)
             .Include(p => p.DetallesPedidos)
                 .ThenInclude(d => d.Producto)
@@ -37,10 +37,14 @@ public class PrevisualizarComandaQueryHandler : IRequestHandler<PrevisualizarCom
         {
             PedidoId = pedido.PedidoId,
             MesaNumero = pedido.Mesa?.NumeroMesa ?? string.Empty,
+            SalonNombre = pedido.Mesa?.Salon?.Nombre ?? string.Empty,
             MozoNombre = pedido.Usuario?.NombreCompleto ?? string.Empty,
             CreadoEn = pedido.CreadoEn,
             EsAdicional = false,
-            Items = pedido.DetallesPedidos.Select(d => new ItemComanda
+            Comentario = pedido.Comentario,
+            Items = pedido.DetallesPedidos
+                .Where(d => d.EstadoDetallePedido != CaraNegra.Domain.Enums.EstadoDetallePedido.Cancelado)
+                .Select(d => new ItemComanda
             {
                 ProductoNombre = d.Producto?.Nombre ?? string.Empty,
                 Cantidad = d.Cantidad,

@@ -36,8 +36,12 @@ public class UpdatePedidoEstadoCommandHandler : IRequestHandler<UpdatePedidoEsta
 
     public async Task<PedidoDto> Handle(UpdatePedidoEstadoCommand request, CancellationToken cancellationToken)
     {
+        // Bloquea el pedido: si llega otra operación sobre él a la vez, espera a que esta termine.
+        await using var tx = await _context.IniciarTransaccionAsync(cancellationToken);
+        await _context.BloquearPedidoAsync(request.PedidoId, cancellationToken);
+
         var pedido = await _context.Pedidos
-            .Include(p => p.Mesa)
+            .Include(p => p.Mesa).ThenInclude(m => m.Salon)
             .Include(p => p.Usuario)
             .Include(p => p.DetallesPedidos)
                 .ThenInclude(d => d.Producto)
@@ -51,6 +55,13 @@ public class UpdatePedidoEstadoCommandHandler : IRequestHandler<UpdatePedidoEsta
         var estadoAnterior = pedido.EstadoPedido;
         var estadoNuevo = request.Dto.EstadoPedido;
 
+        // Anular un pedido exige motivo y deja registro (quién, qué platos, por qué) y avisa a
+        // cocina: eso lo hace AnularPedidoCommand (POST pedidos/{id}/anular), no este cambio de estado.
+        if (estadoNuevo == EstadoPedido.Cancelado)
+        {
+            throw new InvalidOperationException("Para anular un pedido usa «Anular pedido» (pide el motivo y avisa a cocina).");
+        }
+
         if (estadoAnterior == estadoNuevo)
         {
             throw new InvalidOperationException($"El pedido ya se encuentra en estado {estadoAnterior}");
@@ -59,23 +70,6 @@ public class UpdatePedidoEstadoCommandHandler : IRequestHandler<UpdatePedidoEsta
         if (!TransicionesPermitidas.TryGetValue(estadoAnterior, out var permitidas) || !permitidas.Contains(estadoNuevo))
         {
             throw new InvalidOperationException($"No se puede cambiar el pedido de {estadoAnterior} a {estadoNuevo}");
-        }
-
-        if (estadoNuevo == EstadoPedido.Cancelado)
-        {
-            var tienePagosActivos = pedido.Pagos.Any(p => !p.EstaAnulado);
-            if (tienePagosActivos)
-            {
-                throw new InvalidOperationException("No se puede cancelar un pedido que ya tiene pagos registrados. Anule los pagos primero.");
-            }
-
-            foreach (var detalle in pedido.DetallesPedidos)
-            {
-                if (detalle.EstadoDetallePedido != EstadoDetallePedido.Entregado)
-                {
-                    detalle.EstadoDetallePedido = EstadoDetallePedido.Cancelado;
-                }
-            }
         }
 
         // Mantener la pantalla de cocina coherente cuando el estado se cambia a mano (mozo/caja):
@@ -94,41 +88,18 @@ public class UpdatePedidoEstadoCommandHandler : IRequestHandler<UpdatePedidoEsta
 
         pedido.EstadoPedido = estadoNuevo;
 
-        bool mesaLiberada = false;
-        if (estadoNuevo == EstadoPedido.Cancelado)
-        {
-            var otrosPedidos = await _context.Pedidos
-                .AnyAsync(p => p.MesaId == pedido.MesaId && p.PedidoId != pedido.PedidoId
-                    && p.EstadoPedido != EstadoPedido.Cancelado && p.EstadoPedido != EstadoPedido.Entregado, cancellationToken);
-
-            if (!otrosPedidos && pedido.Mesa.Estado != EstadoMesa.Disponible)
-            {
-                pedido.Mesa.Estado = EstadoMesa.Disponible;
-                mesaLiberada = true;
-            }
-        }
-
         await _context.SaveChangesAsync(cancellationToken);
+        await tx.ConfirmarAsync(cancellationToken);
 
         await _hub.NotificarPedidoEstadoCambiado(new PedidoEstadoCambiadoEvent
         {
             PedidoId = pedido.PedidoId,
             MesaNumero = pedido.Mesa.NumeroMesa,
+            SalonNombre = pedido.Mesa?.Salon?.Nombre ?? string.Empty,
             EstadoAnterior = estadoAnterior.ToString(),
             EstadoNuevo = estadoNuevo.ToString(),
             ActualizadoEn = DateTime.UtcNow
         });
-
-        if (mesaLiberada)
-        {
-            await _hub.NotificarMesaEstadoCambiado(new MesaEstadoCambiadoEvent
-            {
-                MesaId = pedido.Mesa.MesaId,
-                NumeroMesa = pedido.Mesa.NumeroMesa,
-                EstadoAnterior = EstadoMesa.Ocupada.ToString(),
-                EstadoNuevo = EstadoMesa.Disponible.ToString()
-            });
-        }
 
         return MapToDto(pedido);
     }
@@ -153,12 +124,14 @@ public class UpdatePedidoEstadoCommandHandler : IRequestHandler<UpdatePedidoEsta
         {
             PedidoId = pedido.PedidoId,
             MesaId = pedido.MesaId,
+            SalonNombre = pedido.Mesa?.Salon?.Nombre ?? string.Empty,
             MesaNumero = pedido.Mesa?.NumeroMesa ?? string.Empty,
             UsuarioId = pedido.UsuarioId,
             UsuarioNombre = pedido.Usuario?.NombreCompleto ?? string.Empty,
             SubTotal = pedido.SubTotal,
             Total = pedido.Total,
             EstadoPedido = pedido.EstadoPedido,
+            Comentario = pedido.Comentario,
             CreadoEn = pedido.CreadoEn,
             Descuento = MapDescuento(pedido),
             Detalles = pedido.DetallesPedidos.Select(d => new PedidoDetalleDto

@@ -34,13 +34,16 @@ public class CambiarEstadoItemCocinaCommandHandler : IRequestHandler<CambiarEsta
 
     public async Task<PedidoCocinaDto> Handle(CambiarEstadoItemCocinaCommand request, CancellationToken cancellationToken)
     {
+        // Bloquea el pedido: si el mozo agrega platos mientras cocina lo marca, no se pisan.
+        await using var tx = await _context.IniciarTransaccionAsync(cancellationToken);
+        await _context.BloquearPedidoAsync(request.PedidoId, cancellationToken);
+
         var pedido = await _context.Pedidos
-            .Include(p => p.Mesa)
+            .Include(p => p.Mesa).ThenInclude(m => m.Salon)
             .Include(p => p.Usuario)
             .Include(p => p.DetallesPedidos)
                 .ThenInclude(d => d.Producto)
                     .ThenInclude(pr => pr.Categoria)
-            .AsSplitQuery()
             .FirstOrDefaultAsync(p => p.PedidoId == request.PedidoId, cancellationToken)
             ?? throw new KeyNotFoundException($"Pedido {request.PedidoId} no encontrado");
 
@@ -63,6 +66,7 @@ public class CambiarEstadoItemCocinaCommandHandler : IRequestHandler<CambiarEsta
         pedido.EstadoPedido = CocinaEstadoHelper.CalcularEstadoPedido(pedido);
 
         await _context.SaveChangesAsync(cancellationToken);
+        await tx.ConfirmarAsync(cancellationToken);
 
         var mesa = pedido.Mesa?.NumeroMesa ?? string.Empty;
 
@@ -83,6 +87,7 @@ public class CambiarEstadoItemCocinaCommandHandler : IRequestHandler<CambiarEsta
             {
                 PedidoId = pedido.PedidoId,
                 MesaNumero = mesa,
+                SalonNombre = pedido.Mesa?.Salon?.Nombre ?? string.Empty,
                 EstadoAnterior = estadoPedidoAnterior.ToString(),
                 EstadoNuevo = pedido.EstadoPedido.ToString(),
                 ActualizadoEn = DateTime.UtcNow

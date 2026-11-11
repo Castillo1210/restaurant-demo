@@ -1,13 +1,17 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Plus, Pencil, Ban, RotateCcw, X, FolderOpen, UtensilsCrossed } from 'lucide-react';
+import { ChevronLeft, Plus, Pencil, Ban, RotateCcw, X, FolderOpen, UtensilsCrossed, Search, ImagePlus, Trash2, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import {
   getCategoriasAdmin, createCategoria, updateCategoria, deleteCategoria,
   getProductosAdmin, createProducto, updateProducto, deleteProducto,
+  subirImagenProducto, quitarImagenProducto,
 } from '../services/adminMenuService';
 import { getCategoryIcon } from '../services/categoryIcons';
+import { comprimirImagen } from '../utils/imagenProducto';
+import { prepararIndice, buscarEnIndice } from '../utils/buscarProductos';
+import FotoProducto from '../components/FotoProducto';
 
 const TIPOS_SUGERIDOS = ['Plato', 'Bebida', 'Entrada', 'Postre', 'Acompañamiento'];
 
@@ -23,6 +27,50 @@ export default function AdminMenu() {
   const [form, setForm] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [busyId, setBusyId] = useState(null);
+  const [consulta, setConsulta] = useState('');
+  const [procesandoFoto, setProcesandoFoto] = useState(false);
+  const inputFoto = useRef(null);
+
+  // Buscador de la lista de productos (mismas reglas que el del mozo: sin tildes, varias palabras).
+  const indiceProductos = useMemo(
+    () => prepararIndice(productos.map((p) => ({ ...p, name: p.nombre, description: p.descripcion, categoryName: p.categoriaNombre }))),
+    [productos]
+  );
+  const productosVisibles = useMemo(
+    () => (consulta.trim() ? buscarEnIndice(indiceProductos, consulta, 500) : productos),
+    [consulta, indiceProductos, productos]
+  );
+
+  // Vista previa local de la foto elegida (se libera al cambiarla o cerrar el formulario).
+  const cerrarForm = () => {
+    if (form?.data?.nuevaImagenUrl) URL.revokeObjectURL(form.data.nuevaImagenUrl);
+    setForm(null);
+  };
+
+  const elegirFoto = async (archivo) => {
+    if (!archivo) return;
+    setProcesandoFoto(true);
+    try {
+      const blob = await comprimirImagen(archivo);
+      if (blob.size > 1_400_000) throw new Error('La foto sigue siendo muy pesada; prueba con otra');
+      setForm((f) => {
+        if (f?.data?.nuevaImagenUrl) URL.revokeObjectURL(f.data.nuevaImagenUrl);
+        return { ...f, data: { ...f.data, nuevaImagen: blob, nuevaImagenUrl: URL.createObjectURL(blob), quitarImagen: false } };
+      });
+    } catch (err) {
+      toast.error(err.message ?? 'No se pudo usar esa imagen');
+    } finally {
+      setProcesandoFoto(false);
+      if (inputFoto.current) inputFoto.current.value = '';
+    }
+  };
+
+  const quitarFotoDelForm = () => {
+    setForm((f) => {
+      if (f?.data?.nuevaImagenUrl) URL.revokeObjectURL(f.data.nuevaImagenUrl);
+      return { ...f, data: { ...f.data, nuevaImagen: null, nuevaImagenUrl: null, quitarImagen: !!f.data.imagen } };
+    });
+  };
 
   const cargarTodo = useCallback(() => {
     setIsLoading(true);
@@ -113,6 +161,10 @@ export default function AdminMenu() {
             tipo: producto.tipo,
             categoriaId: producto.categoriaId,
             estaDisponible: producto.estaDisponible,
+            imagen: producto.imagen,
+            nuevaImagen: null,
+            nuevaImagenUrl: null,
+            quitarImagen: false,
           }
         : {
             nombre: '',
@@ -120,6 +172,10 @@ export default function AdminMenu() {
             precio: '',
             tipo: '',
             categoriaId: categoriasActivas[0]?.id ?? '',
+            imagen: null,
+            nuevaImagen: null,
+            nuevaImagenUrl: null,
+            quitarImagen: false,
           },
     });
   };
@@ -147,9 +203,10 @@ export default function AdminMenu() {
 
     setIsSaving(true);
     try {
+      let productoId = form.data.id;
       if (form.mode === 'crear') {
-        await createProducto({ nombre: nombre.trim(), descripcion, precio: precioNum, tipo: tipo.trim(), categoriaId });
-        toast.success('Producto creado');
+        const creado = await createProducto({ nombre: nombre.trim(), descripcion, precio: precioNum, tipo: tipo.trim(), categoriaId });
+        productoId = creado.id;
       } else {
         await updateProducto(form.data.id, {
           nombre: nombre.trim(),
@@ -159,9 +216,20 @@ export default function AdminMenu() {
           categoriaId,
           estaDisponible: form.data.estaDisponible,
         });
-        toast.success('Producto actualizado');
       }
-      setForm(null);
+
+      // Foto: se sube después de guardar los datos (un producto nuevo necesita su id).
+      let avisoFoto = null;
+      try {
+        if (form.data.nuevaImagen) await subirImagenProducto(productoId, form.data.nuevaImagen);
+        else if (form.data.quitarImagen) await quitarImagenProducto(productoId);
+      } catch (errFoto) {
+        avisoFoto = errFoto.message ?? 'No se pudo guardar la foto';
+      }
+
+      if (avisoFoto) toast.error(`Datos guardados, pero la foto no: ${avisoFoto}`, { duration: 6000 });
+      else toast.success(form.mode === 'crear' ? 'Producto creado' : 'Producto actualizado');
+      cerrarForm();
       cargarTodo();
     } catch (err) {
       toast.error(err.message ?? 'No se pudo guardar el producto');
@@ -219,7 +287,7 @@ export default function AdminMenu() {
             className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors ${
               tab === t.key
                 ? 'bg-primary text-white shadow-glow-orange'
-                : 'bg-card text-gray-400 border border-gray-800/50 hover:text-white'
+                : 'bg-card text-gray-400 border border-gray-800/50 hover:text-ink'
             }`}
           >
             {t.label}
@@ -234,7 +302,7 @@ export default function AdminMenu() {
           <motion.button
             whileTap={{ scale: 0.97 }}
             onClick={() => abrirFormCategoria()}
-            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border border-dashed border-gray-700 text-gray-400 hover:text-white hover:border-primary/50 transition-colors font-semibold text-sm"
+            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border border-dashed border-gray-700 text-gray-400 hover:text-ink hover:border-primary/50 transition-colors font-semibold text-sm"
           >
             <Plus size={16} />
             Nueva categoría
@@ -256,7 +324,7 @@ export default function AdminMenu() {
             >
               <span className="text-2xl flex-shrink-0">{getCategoryIcon(cat.nombre)}</span>
               <div className="flex-1 min-w-0">
-                <p className="font-bold text-white text-sm truncate">{cat.nombre}</p>
+                <p className="font-bold text-ink text-sm truncate">{cat.nombre}</p>
                 {cat.descripcion && (
                   <p className="text-xs text-gray-500 truncate mt-0.5">{cat.descripcion}</p>
                 )}
@@ -267,7 +335,7 @@ export default function AdminMenu() {
               <div className="flex items-center gap-1.5 flex-shrink-0">
                 <button
                   onClick={() => abrirFormCategoria(cat)}
-                  className="p-2 hover:bg-cardHighlight rounded-full text-gray-500 hover:text-white transition-colors"
+                  className="p-2 hover:bg-cardHighlight rounded-full text-gray-500 hover:text-ink transition-colors"
                   title="Editar"
                 >
                   <Pencil size={15} />
@@ -294,7 +362,7 @@ export default function AdminMenu() {
             whileTap={{ scale: 0.97 }}
             onClick={() => abrirFormProducto()}
             disabled={categoriasActivas.length === 0}
-            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border border-dashed border-gray-700 text-gray-400 hover:text-white hover:border-primary/50 transition-colors font-semibold text-sm disabled:opacity-40"
+            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border border-dashed border-gray-700 text-gray-400 hover:text-ink hover:border-primary/50 transition-colors font-semibold text-sm disabled:opacity-40"
           >
             <Plus size={16} />
             Nuevo producto
@@ -312,15 +380,34 @@ export default function AdminMenu() {
             </div>
           )}
 
-          {productos.map((prod) => (
+          {productos.length > 0 && (
+            <div className="relative">
+              <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+              <input
+                type="search"
+                value={consulta}
+                onChange={(e) => setConsulta(e.target.value)}
+                placeholder={`Buscar entre ${productos.length} productos…`}
+                aria-label="Buscar producto"
+                autoComplete="off"
+                className="w-full bg-card border border-gray-800/50 rounded-2xl pl-10 pr-4 py-3 text-sm text-ink placeholder-gray-600 focus:outline-none focus:border-primary transition-colors"
+              />
+            </div>
+          )}
+          {consulta.trim() && productosVisibles.length === 0 && (
+            <p className="text-sm text-gray-500 text-center py-6">No hay productos que coincidan con “{consulta.trim()}”.</p>
+          )}
+
+          {productosVisibles.map((prod) => (
             <div
               key={prod.id}
-              className={`bg-card border rounded-2xl p-4 flex items-center gap-3 ${
+              className={`bg-card border rounded-2xl p-3 flex items-center gap-3 ${
                 prod.estaDisponible ? 'border-gray-800/50' : 'border-gray-800/30 opacity-60'
               }`}
             >
+              <FotoProducto src={prod.imagen} alt={prod.nombre} className="w-12 h-12 rounded-xl flex-shrink-0" iconSize={18} />
               <div className="flex-1 min-w-0">
-                <p className="font-bold text-white text-sm truncate">{prod.nombre}</p>
+                <p className="font-bold text-ink text-sm truncate">{prod.nombre}</p>
                 <p className="text-xs text-gray-500 mt-0.5">
                   {prod.categoriaNombre} · {prod.tipo}
                 </p>
@@ -332,7 +419,7 @@ export default function AdminMenu() {
               <div className="flex items-center gap-1.5 flex-shrink-0">
                 <button
                   onClick={() => abrirFormProducto(prod)}
-                  className="p-2 hover:bg-cardHighlight rounded-full text-gray-500 hover:text-white transition-colors"
+                  className="p-2 hover:bg-cardHighlight rounded-full text-gray-500 hover:text-ink transition-colors"
                   title="Editar"
                 >
                   <Pencil size={15} />
@@ -364,7 +451,7 @@ export default function AdminMenu() {
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex flex-col justify-end"
           >
-            <motion.div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setForm(null)} />
+            <motion.div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={cerrarForm} />
 
             <motion.div
               initial={{ y: '100%' }}
@@ -384,7 +471,7 @@ export default function AdminMenu() {
                 </h2>
                 <motion.button
                   whileTap={{ scale: 0.9 }}
-                  onClick={() => setForm(null)}
+                  onClick={cerrarForm}
                   className="p-2 bg-background/60 rounded-full hover:bg-gray-700 transition-colors"
                 >
                   <X size={18} className="text-gray-400" />
@@ -408,7 +495,7 @@ export default function AdminMenu() {
                         onChange={(e) => setForm({ ...form, data: { ...form.data, nombre: e.target.value } })}
                         autoFocus
                         placeholder="Ej: Hamburguesas"
-                        className="w-full bg-background border border-gray-700/50 rounded-2xl px-4 py-3.5 text-white placeholder-gray-600 focus:outline-none focus:border-primary transition-colors text-sm"
+                        className="w-full bg-background border border-gray-700/50 rounded-2xl px-4 py-3.5 text-ink placeholder-gray-600 focus:outline-none focus:border-primary transition-colors text-sm"
                       />
                     </div>
                     <div>
@@ -418,12 +505,59 @@ export default function AdminMenu() {
                         onChange={(e) => setForm({ ...form, data: { ...form.data, descripcion: e.target.value } })}
                         rows={2}
                         placeholder="Ej: Hamburguesas clásicas y especiales"
-                        className="w-full bg-background border border-gray-700/50 rounded-2xl px-4 py-3.5 text-white placeholder-gray-600 focus:outline-none focus:border-primary transition-colors text-sm resize-none"
+                        className="w-full bg-background border border-gray-700/50 rounded-2xl px-4 py-3.5 text-ink placeholder-gray-600 focus:outline-none focus:border-primary transition-colors text-sm resize-none"
                       />
                     </div>
                   </>
                 ) : (
                   <>
+                    {/* Foto del plato: se reduce en el navegador antes de subirla */}
+                    <div>
+                      <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Foto (opcional)</label>
+                      <div className="flex items-center gap-4">
+                        <FotoProducto
+                          src={form.data.nuevaImagenUrl || (form.data.quitarImagen ? null : form.data.imagen)}
+                          alt="Foto del producto"
+                          className="w-24 h-24 rounded-2xl flex-shrink-0 border border-gray-700/50"
+                          iconSize={28}
+                          diferida={false}
+                        />
+                        <div className="flex flex-col gap-2 min-w-0">
+                          <input
+                            ref={inputFoto}
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp,image/*"
+                            className="hidden"
+                            onChange={(e) => elegirFoto(e.target.files?.[0])}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => inputFoto.current?.click()}
+                            disabled={procesandoFoto}
+                            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-background border border-gray-700/50 text-sm font-semibold text-gray-200 hover:border-primary/60 disabled:opacity-60"
+                          >
+                            {procesandoFoto ? <Loader2 size={15} className="animate-spin" /> : <ImagePlus size={15} />}
+                            {procesandoFoto
+                              ? 'Preparando…'
+                              : (form.data.nuevaImagenUrl || (form.data.imagen && !form.data.quitarImagen)) ? 'Cambiar foto' : 'Elegir foto'}
+                          </button>
+                          {(form.data.nuevaImagenUrl || (form.data.imagen && !form.data.quitarImagen)) && (
+                            <button
+                              type="button"
+                              onClick={quitarFotoDelForm}
+                              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-gray-400 hover:text-red-400"
+                            >
+                              <Trash2 size={14} /> Quitar foto
+                            </button>
+                          )}
+                          {form.data.nuevaImagen && (
+                            <p className="text-[11px] text-gray-500">
+                              Lista para guardar · {Math.max(1, Math.round(form.data.nuevaImagen.size / 1024))} KB
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Nombre</label>
                       <input
@@ -432,7 +566,7 @@ export default function AdminMenu() {
                         onChange={(e) => setForm({ ...form, data: { ...form.data, nombre: e.target.value } })}
                         autoFocus
                         placeholder="Ej: Cara Negra Clásica"
-                        className="w-full bg-background border border-gray-700/50 rounded-2xl px-4 py-3.5 text-white placeholder-gray-600 focus:outline-none focus:border-primary transition-colors text-sm"
+                        className="w-full bg-background border border-gray-700/50 rounded-2xl px-4 py-3.5 text-ink placeholder-gray-600 focus:outline-none focus:border-primary transition-colors text-sm"
                       />
                     </div>
                     <div>
@@ -442,7 +576,7 @@ export default function AdminMenu() {
                         onChange={(e) => setForm({ ...form, data: { ...form.data, descripcion: e.target.value } })}
                         rows={2}
                         placeholder="Ej: Doble carne, queso cheddar, tocino"
-                        className="w-full bg-background border border-gray-700/50 rounded-2xl px-4 py-3.5 text-white placeholder-gray-600 focus:outline-none focus:border-primary transition-colors text-sm resize-none"
+                        className="w-full bg-background border border-gray-700/50 rounded-2xl px-4 py-3.5 text-ink placeholder-gray-600 focus:outline-none focus:border-primary transition-colors text-sm resize-none"
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
@@ -456,7 +590,7 @@ export default function AdminMenu() {
                             min="0"
                             value={form.data.precio}
                             onChange={(e) => setForm({ ...form, data: { ...form.data, precio: e.target.value } })}
-                            className="w-full bg-background border border-gray-700/50 rounded-2xl pl-9 pr-3 py-3.5 text-white focus:outline-none focus:border-primary transition-colors text-sm"
+                            className="w-full bg-background border border-gray-700/50 rounded-2xl pl-9 pr-3 py-3.5 text-ink focus:outline-none focus:border-primary transition-colors text-sm"
                           />
                         </div>
                       </div>
@@ -468,7 +602,7 @@ export default function AdminMenu() {
                           value={form.data.tipo}
                           onChange={(e) => setForm({ ...form, data: { ...form.data, tipo: e.target.value } })}
                           placeholder="Ej: Plato"
-                          className="w-full bg-background border border-gray-700/50 rounded-2xl px-4 py-3.5 text-white placeholder-gray-600 focus:outline-none focus:border-primary transition-colors text-sm"
+                          className="w-full bg-background border border-gray-700/50 rounded-2xl px-4 py-3.5 text-ink placeholder-gray-600 focus:outline-none focus:border-primary transition-colors text-sm"
                         />
                         <datalist id="tipos-sugeridos">
                           {TIPOS_SUGERIDOS.map((t) => <option key={t} value={t} />)}
@@ -480,7 +614,7 @@ export default function AdminMenu() {
                       <select
                         value={form.data.categoriaId}
                         onChange={(e) => setForm({ ...form, data: { ...form.data, categoriaId: Number(e.target.value) } })}
-                        className="w-full bg-background border border-gray-700/50 rounded-2xl px-4 py-3.5 text-white focus:outline-none focus:border-primary transition-colors text-sm"
+                        className="w-full bg-background border border-gray-700/50 rounded-2xl px-4 py-3.5 text-ink focus:outline-none focus:border-primary transition-colors text-sm"
                       >
                         <option value="" disabled>Selecciona una categoría</option>
                         {categoriasActivas.map((c) => (

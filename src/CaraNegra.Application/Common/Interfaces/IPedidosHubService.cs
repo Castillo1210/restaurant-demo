@@ -15,6 +15,7 @@ public record NuevoPedidoEvent
 {
     public int PedidoId { get; init; }
     public string MesaNumero { get; init; } = string.Empty;
+    public string SalonNombre { get; init; } = string.Empty;
     public string MozoNombre { get; init; } = string.Empty;
     public DateTime CreadoEn { get; init; }
     public List<PedidoDetalleEvent> Detalles { get; init; } = new();
@@ -32,6 +33,7 @@ public record PedidoEstadoCambiadoEvent
 {
     public int PedidoId { get; init; }
     public string MesaNumero { get; init; } = string.Empty;
+    public string SalonNombre { get; init; } = string.Empty;
     public string EstadoAnterior { get; init; } = string.Empty;
     public string EstadoNuevo { get; init; } = string.Empty;
     public DateTime ActualizadoEn { get; init; }

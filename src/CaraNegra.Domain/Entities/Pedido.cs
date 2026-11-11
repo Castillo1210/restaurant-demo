@@ -10,9 +10,18 @@ public class Pedido : BaseEntity
     public decimal Total { get; set; }
     public EstadoPedido EstadoPedido { get; set; } = EstadoPedido.Pendiente;
 
+    /// <summary>
+    /// Comentario general del pedido ("todo para llevar", "cliente apurado", "servir juntos").
+    /// Distinto de las notas de cada plato. Sale en la comanda y en la pantalla de cocina.
+    /// </summary>
+    public string? Comentario { get; set; }
+
     // Claves foraneas
     public int MesaId { get; set; }
     public int UsuarioId { get; set; }
+
+    /// <summary>Jornada (día operativo) en la que se registró. Null en datos anteriores a las jornadas.</summary>
+    public int? JornadaId { get; set; }
 
     // Propiedades de navegacion
     public Mesa Mesa { get; set; } = null!;

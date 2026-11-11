@@ -16,15 +16,10 @@ public class GetMesaByIdQueryHandler : IRequestHandler<GetMesaByIdQuery, MesaDto
     public async Task<MesaDto> Handle(GetMesaByIdQuery request, CancellationToken cancellationToken)
     {
         var mesa = await _context.Mesas
+            .Include(m => m.Salon)
             .FirstOrDefaultAsync(m => m.MesaId == request.MesaId, cancellationToken)
             ?? throw new KeyNotFoundException($"Mesa {request.MesaId} no encontrada");
 
-        return new MesaDto
-        {
-            MesaId = mesa.MesaId,
-            NumeroMesa = mesa.NumeroMesa,
-            Estado = mesa.Estado,
-            CreadoEn = mesa.CreadoEn
-        };
+        return MesaMapper.ToDto(mesa);
     }
 }

@@ -39,15 +39,8 @@ public class PagosController : ControllerBase
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(int id)
     {
-        try
-        {
-            var result = await _mediator.Send(new GetPagoByIdQuery(id));
-            return Ok(result);
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { mensaje = ex.Message });
-        }
+        var result = await _mediator.Send(new GetPagoByIdQuery(id));
+        return Ok(result);
     }
 
     /// <summary>
@@ -66,19 +59,8 @@ public class PagosController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreatePagoDto dto)
     {
-        try
-        {
-            var result = await _mediator.Send(new CreatePagoCommand(dto));
-            return CreatedAtAction(nameof(GetById), new { id = result.PagoId }, result);
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { mensaje = ex.Message });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { mensaje = ex.Message });
-        }
+        var result = await _mediator.Send(new CreatePagoCommand(dto));
+        return CreatedAtAction(nameof(GetById), new { id = result.PagoId }, result);
     }
 
     /// <summary>
@@ -87,20 +69,9 @@ public class PagosController : ControllerBase
     [HttpDelete("{id}")]
     public async Task<IActionResult> Anular(int id, [FromBody] AnularPagoRequest request)
     {
-        try
-        {
-            var usuarioId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-            var result = await _mediator.Send(new AnularPagoCommand(id, request.Motivo, usuarioId));
-            return Ok(result);
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { mensaje = ex.Message });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { mensaje = ex.Message });
-        }
+        var usuarioId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        var result = await _mediator.Send(new AnularPagoCommand(id, request.Motivo, usuarioId));
+        return Ok(result);
     }
 }
 

@@ -1,6 +1,6 @@
 using CaraNegra.Application.Common.Interfaces;
+using CaraNegra.Application.Pedidos;
 using CaraNegra.Application.Pedidos.DTOs;
-using CaraNegra.Domain.Enums;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 
@@ -18,7 +18,7 @@ public class CreatePedidoDtoValidator : AbstractValidator<CreatePedidoDto>
         // ASP.NET Core — las reglas de abajo usan Must + .Any síncrono en vez de MustAsync/.AnyAsync.
         RuleFor(x => x.MesaId)
             .GreaterThan(0).WithMessage("La mesa es requerida")
-            .Must(BeValidMesa).WithMessage("La mesa no existe o no está disponible");
+            .Must(BeValidMesa).WithMessage("La mesa no existe");
 
         RuleFor(x => x.UsuarioId)
             .GreaterThan(0).WithMessage("El usuario es requerido")
@@ -28,11 +28,19 @@ public class CreatePedidoDtoValidator : AbstractValidator<CreatePedidoDto>
             .NotEmpty().WithMessage("El pedido debe tener al menos un item")
             .Must(d => d.Count <= 50).WithMessage("El pedido no puede tener más de 50 items");
 
+        RuleFor(x => x.Comentario)
+            .MaximumLength(ComentarioPedido.Maximo)
+            .WithMessage($"El comentario del pedido admite hasta {ComentarioPedido.Maximo} caracteres");
+
         RuleForEach(x => x.Detalles).ChildRules(detalle =>
         {
             detalle.RuleFor(x => x.ProductoId)
                 .GreaterThan(0).WithMessage("El producto es requerido")
                 .Must(BeValidProducto).WithMessage("El producto no existe o no está disponible");
+
+            detalle.RuleFor(x => x.Notas)
+                .MaximumLength(NotaPlato.Maximo)
+                .WithMessage($"La nota de un plato admite hasta {NotaPlato.Maximo} caracteres");
 
             detalle.RuleFor(x => x.Cantidad)
                 .GreaterThan(0).WithMessage("La cantidad debe ser mayor a 0")
@@ -42,10 +50,10 @@ public class CreatePedidoDtoValidator : AbstractValidator<CreatePedidoDto>
 
     private bool BeValidMesa(int mesaId)
     {
-        // Una mesa Reservada también puede recibir un pedido nuevo (el cliente de la
-        // reserva se sienta y el mozo toma la orden); solo Ocupada/Mantenimiento bloquean.
-        return _context.Mesas.Any(m => m.MesaId == mesaId
-            && (m.Estado == EstadoMesa.Disponible || m.Estado == EstadoMesa.Reservada));
+        // Solo que exista. Si está ocupada o en mantenimiento lo decide el comando, con la mesa
+        // bloqueada (sin carrera entre dos mozos) y con un mensaje claro; además así un reintento
+        // del mismo envío (Wi-Fi) llega al comando y recibe el pedido ya creado en vez de un error.
+        return _context.Mesas.Any(m => m.MesaId == mesaId);
     }
 
     private bool BeValidUsuario(int usuarioId)

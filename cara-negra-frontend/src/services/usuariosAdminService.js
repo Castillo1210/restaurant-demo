@@ -15,6 +15,8 @@ const mapUsuario = (u) => ({
   estaActivo: u.esVerificado,
   ultimoAccesoEn: u.ultimoAccesoEn,
   creadoEn: u.creadoEn,
+  tienePin: !!u.tienePin,
+  pinBloqueadoHasta: u.pinBloqueadoHasta ?? null,
 });
 
 /**
@@ -83,5 +85,34 @@ export const resetPassword = async (id, newPassword) => {
     });
   } catch (error) {
     throw new Error(getApiErrorMessage(error, 'No se pudo resetear la contraseña'));
+  }
+};
+
+// ─── PIN de ingreso rápido (solo MOZO y COCINA) ─────────────────────────────
+
+/** Asigna o cambia el PIN de 4 dígitos (también lo desbloquea). */
+export const asignarPin = async (id, pin) => {
+  try {
+    await api.put(`/usuarios/${id}/pin`, { pin });
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, 'No se pudo guardar el PIN'));
+  }
+};
+
+/** Quita el PIN: el usuario vuelve a entrar solo con contraseña. */
+export const quitarPin = async (id) => {
+  try {
+    await api.delete(`/usuarios/${id}/pin`);
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, 'No se pudo quitar el PIN'));
+  }
+};
+
+/** Desbloquea un PIN bloqueado por intentos fallidos. */
+export const desbloquearPin = async (id) => {
+  try {
+    await api.post(`/usuarios/${id}/pin/desbloquear`);
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, 'No se pudo desbloquear el PIN'));
   }
 };

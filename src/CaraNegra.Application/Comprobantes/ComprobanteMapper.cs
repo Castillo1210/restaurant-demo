@@ -23,11 +23,13 @@ public static class ComprobanteMapper
 
     public static string FormatearNumero(string serie, int correlativo) => $"{serie}-{correlativo:D8}";
 
-    public static ComprobanteDto ToDto(Comprobante c, DatosEmpresa empresa)
-    {
-        var pedido = c.Pedido;
-
-        var items = (pedido?.DetallesPedidos ?? new List<DetallePedido>())
+    /// <summary>
+    /// Líneas del comprobante a partir de los platos del pedido (sin los cancelados), agrupando el
+    /// mismo producto al mismo precio. Se usa para el ticket y para el envío al proveedor (PSE),
+    /// así lo impreso y lo enviado a SUNAT coinciden.
+    /// </summary>
+    public static List<ComprobanteItemDto> ItemsDelPedido(Pedido? pedido) =>
+        (pedido?.DetallesPedidos ?? new List<DetallePedido>())
             .Where(d => d.EstadoDetallePedido != EstadoDetallePedido.Cancelado)
             .GroupBy(d => new { d.ProductoId, d.Monto, Nombre = d.Producto?.Nombre ?? "Producto" })
             .Select(g => new ComprobanteItemDto
@@ -38,6 +40,12 @@ public static class ComprobanteMapper
                 Importe = g.Sum(d => d.Cantidad * d.Monto)
             })
             .ToList();
+
+    public static ComprobanteDto ToDto(Comprobante c, DatosEmpresa empresa)
+    {
+        var pedido = c.Pedido;
+
+        var items = ItemsDelPedido(pedido);
 
         var pagos = (pedido?.Pagos ?? new List<Pago>())
             .Where(p => !p.EstaAnulado)
@@ -52,7 +60,7 @@ public static class ComprobanteMapper
         // RUC | TIPO | SERIE | NUMERO | IGV | TOTAL | FECHA | TIPO DOC ADQ | NRO DOC ADQ | HASH |
         var fechaLocal = PeruDateRangeHelper.ToHoraPeru(c.FechaEmision);
         var cadenaQr = string.Join("|",
-            empresa.Ruc,
+            c.EmisorRuc ?? empresa.Ruc,
             CodigoTipo(c.TipoComprobante),
             c.Serie,
             c.Correlativo.ToString("D8"),
@@ -68,6 +76,7 @@ public static class ComprobanteMapper
             ComprobanteId = c.ComprobanteId,
             PedidoId = c.PedidoId,
             MesaNumero = pedido?.Mesa?.NumeroMesa ?? string.Empty,
+            SalonNombre = pedido?.Mesa?.Salon?.Nombre ?? string.Empty,
             TipoComprobante = c.TipoComprobante,
             CodigoTipo = CodigoTipo(c.TipoComprobante),
             Serie = c.Serie,
@@ -79,7 +88,7 @@ public static class ComprobanteMapper
             ClienteDireccion = c.ClienteDireccion,
             OpGravada = c.OpGravada,
             Igv = c.Igv,
-            IgvPorcentaje = empresa.IgvPorcentaje,
+            IgvPorcentaje = c.IgvPorcentaje > 0 ? c.IgvPorcentaje : empresa.IgvPorcentaje,
             Descuento = c.Descuento,
             Total = c.Total,
             FechaEmision = c.FechaEmision,
@@ -87,15 +96,23 @@ public static class ComprobanteMapper
             CadenaQr = cadenaQr,
             Estado = c.Estado,
             EsSimulacion = c.EsSimulacion,
+            Ambiente = string.IsNullOrEmpty(c.Ambiente) ? "SIMULADO" : c.Ambiente,
+            MensajeSunat = c.MensajeSunat,
+            XmlUrl = c.XmlUrl,
+            CdrUrl = c.CdrUrl,
+            PdfUrl = c.PdfUrl,
             AtendidoPor = pedido?.Usuario?.NombreCompleto ?? string.Empty,
             EmitidoPor = c.Usuario?.NombreCompleto ?? string.Empty,
             Emisor = new EmisorDto
             {
-                Ruc = empresa.Ruc,
-                RazonSocial = empresa.RazonSocial,
-                NombreComercial = empresa.NombreComercial,
-                Direccion = empresa.Direccion,
-                Telefono = empresa.Telefono
+                Ruc = c.EmisorRuc ?? empresa.Ruc,
+                RazonSocial = c.EmisorRazonSocial ?? empresa.RazonSocial,
+                NombreComercial = c.EmisorNombreComercial ?? empresa.NombreComercial,
+                Direccion = c.EmisorDireccion ?? empresa.Direccion,
+                Telefono = empresa.Telefono,
+                Email = empresa.Email,
+                LogoBase64 = empresa.LogoBase64,
+                MensajePie = empresa.MensajePie
             },
             Items = items,
             Pagos = pagos

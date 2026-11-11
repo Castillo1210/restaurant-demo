@@ -1,4 +1,5 @@
 using CaraNegra.Application.Common.Interfaces;
+using CaraNegra.Application.Mesas;
 using CaraNegra.Application.Pedidos.DTOs;
 using CaraNegra.Application.Pagos.DTOs;
 using CaraNegra.Domain.Entities;
@@ -18,8 +19,15 @@ public class UpdatePedidoCommandHandler : IRequestHandler<UpdatePedidoCommand, P
 
     public async Task<PedidoDto> Handle(UpdatePedidoCommand request, CancellationToken cancellationToken)
     {
+        // Bloquea el pedido: si llega otra operación sobre él a la vez, espera a que esta termine.
+        await using var tx = await _context.IniciarTransaccionAsync(cancellationToken);
+        await _context.BloquearPedidoAsync(request.PedidoId, cancellationToken);
+        // Mesa destino: bloqueada también, para que otro mozo no la ocupe al mismo tiempo.
+        if (request.Dto.MesaId > 0)
+            await _context.BloquearMesaAsync(request.Dto.MesaId, cancellationToken);
+
         var pedido = await _context.Pedidos
-            .Include(p => p.Mesa)
+            .Include(p => p.Mesa).ThenInclude(m => m.Salon)
             .Include(p => p.Usuario)
             .Include(p => p.DetallesPedidos)
                 .ThenInclude(d => d.Producto)
@@ -44,38 +52,27 @@ public class UpdatePedidoCommandHandler : IRequestHandler<UpdatePedidoCommand, P
             .FirstOrDefaultAsync(u => u.UsuarioId == request.Dto.UsuarioId, cancellationToken)
             ?? throw new KeyNotFoundException($"Usuario {request.Dto.UsuarioId} no encontrado");
 
-        // Si cambia la mesa, liberar la anterior y ocupar la nueva
+        // Si cambia la mesa, liberar la anterior (si no le queda otro pedido) y ocupar la nueva
         if (pedido.MesaId != request.Dto.MesaId)
         {
-            var mesaAnterior = await _context.Mesas.FindAsync(new object[] { pedido.MesaId }, cancellationToken);
-            if (mesaAnterior != null)
-            {
-                // Verificar si hay otros pedidos en la mesa anterior
-                var otrosPedidos = await _context.Pedidos
-                    .AnyAsync(p => p.MesaId == pedido.MesaId && p.PedidoId != request.PedidoId 
-                        && p.EstadoPedido != EstadoPedido.Cancelado && p.EstadoPedido != EstadoPedido.Entregado, cancellationToken);
-                
-                if (!otrosPedidos)
-                {
-                    mesaAnterior.Estado = EstadoMesa.Disponible;
-                }
-            }
+            await MesaOcupacion.LiberarSiQuedaLibreAsync(_context, pedido.MesaId, pedido.PedidoId, cancellationToken);
 
             if (mesa.Estado != EstadoMesa.Disponible)
             {
                 throw new InvalidOperationException($"La mesa {mesa.NumeroMesa} no está disponible");
             }
-            mesa.Estado = EstadoMesa.Ocupada;
+            MesaOcupacion.Ocupar(mesa);
         }
 
         pedido.MesaId = request.Dto.MesaId;
         pedido.UsuarioId = request.Dto.UsuarioId;
 
         await _context.SaveChangesAsync(cancellationToken);
+        await tx.ConfirmarAsync(cancellationToken);
 
         // Recargar para el DTO
         var pedidoActualizado = await _context.Pedidos
-            .Include(p => p.Mesa)
+            .Include(p => p.Mesa).ThenInclude(m => m.Salon)
             .Include(p => p.Usuario)
             .Include(p => p.DetallesPedidos)
                 .ThenInclude(d => d.Producto)
@@ -108,12 +105,14 @@ public class UpdatePedidoCommandHandler : IRequestHandler<UpdatePedidoCommand, P
         {
             PedidoId = pedido.PedidoId,
             MesaId = pedido.MesaId,
+            SalonNombre = pedido.Mesa?.Salon?.Nombre ?? string.Empty,
             MesaNumero = pedido.Mesa?.NumeroMesa ?? string.Empty,
             UsuarioId = pedido.UsuarioId,
             UsuarioNombre = pedido.Usuario?.NombreCompleto ?? string.Empty,
             SubTotal = pedido.SubTotal,
             Total = pedido.Total,
             EstadoPedido = pedido.EstadoPedido,
+            Comentario = pedido.Comentario,
             CreadoEn = pedido.CreadoEn,
             Descuento = MapDescuento(pedido),
             Detalles = pedido.DetallesPedidos.Select(d => new PedidoDetalleDto

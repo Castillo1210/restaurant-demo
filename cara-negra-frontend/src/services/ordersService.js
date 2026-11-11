@@ -43,6 +43,7 @@ const mapPedido = (p) => ({
   id: p.pedidoId,
   mesaId: p.mesaId,
   mesaNumero: p.mesaNumero,
+  salonNombre: p.salonNombre ?? '',
   usuarioId: p.usuarioId,
   usuarioNombre: p.usuarioNombre,
   subTotal: p.subTotal,
@@ -51,23 +52,30 @@ const mapPedido = (p) => ({
   detalles: (p.detalles ?? []).map(mapDetalle),
   pagos: (p.pagos ?? []).map(mapPago),
   descuento: mapDescuento(p.descuento),
+  comentario: p.comentario ?? '',
   creadoEn: p.creadoEn,
 });
 
 /**
  * Crea un nuevo pedido (toma de orden). Ocupa la mesa automáticamente.
- * @param {{ mesaId: number, usuarioId: number, detalles: Array<{productoId:number, cantidad:number, notas?:string}> }} payload
+ * @param {{ mesaId: number, usuarioId: number, detalles: Array<{productoId:number, cantidad:number, notas?:string}>, comentario?: string }} payload
+ *   comentario = comentario general del pedido ("todo para llevar"), opcional.
  * @returns {Promise<Object>} pedido creado
  */
-export const createPedido = async ({ mesaId, usuarioId, detalles }) => {
+export const createPedido = async ({ mesaId, usuarioId, detalles, comentario, operacionId }) => {
   try {
     const { data } = await api.post('/pedidos', {
       mesaId,
       usuarioId,
+      comentario: comentario?.trim() || null,
+      // Código del envío: si se reintenta por el Wi-Fi, el servidor no crea otro pedido.
+      ...(operacionId ? { operacionId } : {}),
       detalles: detalles.map((d) => ({
         productoId: d.productoId,
         cantidad: d.cantidad,
         notas: d.notas || null,
+        // Precio distinto al de la carta (solo cajero / admin; el servidor lo valida).
+        ...(d.precioUnitario != null ? { precioUnitario: d.precioUnitario } : {}),
       })),
     });
     return mapPedido(data);
@@ -82,8 +90,50 @@ export const createPedido = async ({ mesaId, usuarioId, detalles }) => {
  * @returns {Promise<Object>}
  */
 export const getPedidoById = async (id) => {
-  const { data } = await api.get(`/pedidos/${id}`);
-  return mapPedido(data);
+  const [{ data }, anulados, cambiosPrecio] = await Promise.all([
+    api.get(`/pedidos/${id}`), getAnulacionesPedido(id), getCambiosPrecioPedido(id),
+  ]);
+  return { ...mapPedido(data), anulados, cambiosPrecio };
+};
+
+/** Precios distintos a la carta en un pedido (quién, cuándo, de cuánto a cuánto). [] si falla. */
+export const getCambiosPrecioPedido = async (pedidoId) => {
+  try {
+    const { data } = await api.get(`/pedidos/${pedidoId}/cambios-precio`);
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+};
+
+/**
+ * Cambia el precio de una línea ya enviada (solo cajero / admin, sin pagos registrados).
+ * Queda registrado con el nombre de quien lo hizo.
+ * @param {number} pedidoId
+ * @param {number} detalleId
+ * @param {{ precio: number, motivo?: string }} datos
+ */
+export const cambiarPrecioDetalle = async (pedidoId, detalleId, { precio, motivo }) => {
+  try {
+    const { data } = await api.put(`/pedidos/${pedidoId}/detalles/${detalleId}/precio`, { precio, motivo: motivo || null });
+    return mapPedido(data);
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, 'No se pudo cambiar el precio'));
+  }
+};
+
+/**
+ * Productos quitados de un pedido (quién, cuándo, cuánto y por qué), del más reciente al más
+ * antiguo. Si falla devuelve [] (es información de control, no debe impedir trabajar).
+ * @param {number} pedidoId
+ */
+export const getAnulacionesPedido = async (pedidoId) => {
+  try {
+    const { data } = await api.get(`/pedidos/${pedidoId}/anulados`);
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
 };
 
 /**
@@ -148,16 +198,78 @@ export const agregarDetalle = async (pedidoId, { productoId, cantidad, notas }) 
 };
 
 /**
- * Quita un ítem de un pedido existente (Pendiente o En Preparación).
+ * Agrega VARIOS ítems a un pedido en una sola petición (todo o nada, una sola comanda).
+ * @param {number} pedidoId
+ * @param {{productoId:number, cantidad:number, notas?:string}[]} detalles
+ * @param {string} [comentario] comentario general del pedido: undefined = no se toca, '' lo borra
+ */
+export const agregarDetalles = async (pedidoId, detalles, comentario, operacionId) => {
+  try {
+    const { data } = await api.post(`/pedidos/${pedidoId}/detalles/lote`, {
+      ...(comentario !== undefined ? { comentario: comentario.trim() } : {}),
+      // Código del envío: si se reintenta por el Wi-Fi, el servidor no duplica los platos.
+      ...(operacionId ? { operacionId } : {}),
+      detalles: detalles.map((d) => ({
+        productoId: d.productoId,
+        cantidad: d.cantidad,
+        notas: d.notas || null,
+        ...(d.precioUnitario != null ? { precioUnitario: d.precioUnitario } : {}),
+      })),
+    });
+    return mapPedido(data);
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, 'No se pudieron agregar los ítems al pedido'));
+  }
+};
+
+/** Máximo del comentario general del pedido (igual que en el servidor). */
+export const COMENTARIO_MAXIMO = 300;
+
+/**
+ * Cambia el comentario general del pedido ("todo para llevar"). '' lo borra. Si queda un
+ * comentario, cocina recibe un ticket corto con él. El mozo solo en sus propias mesas.
+ * @param {number} pedidoId
+ * @param {string} comentario
+ */
+export const actualizarComentarioPedido = async (pedidoId, comentario) => {
+  try {
+    const { data } = await api.put(`/pedidos/${pedidoId}/comentario`, { comentario: comentario?.trim() ?? '' });
+    return mapPedido(data);
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, 'No se pudo guardar el comentario del pedido'));
+  }
+};
+
+/**
+ * Quita (anula) un ítem de un pedido Pendiente o En Preparación. Queda registrado quién lo hizo,
+ * cuándo y el motivo (obligatorio); cocina recibe un aviso "ANULADO".
  * @param {number} pedidoId
  * @param {number} detalleId
+ * @param {{ motivo: string, cantidad?: number }} datos cantidad = unidades a quitar (todas si se omite)
  */
-export const eliminarDetalle = async (pedidoId, detalleId) => {
+export const eliminarDetalle = async (pedidoId, detalleId, { motivo, cantidad } = {}) => {
   try {
-    const { data } = await api.delete(`/pedidos/${pedidoId}/detalles/${detalleId}`);
+    const { data } = await api.delete(`/pedidos/${pedidoId}/detalles/${detalleId}`, {
+      params: { motivo, ...(cantidad ? { cantidad } : {}) },
+    });
     return mapPedido(data);
   } catch (error) {
     throw new Error(getApiErrorMessage(error, 'No se pudo quitar el ítem del pedido'));
+  }
+};
+
+/**
+ * Anula el pedido COMPLETO (motivo obligatorio): cada plato queda registrado como anulado, a
+ * cocina le sale "PEDIDO ANULADO" y la mesa queda libre. No se puede si tiene un pago activo.
+ * @param {number} pedidoId
+ * @param {string} motivo
+ */
+export const anularPedido = async (pedidoId, motivo, avisarCocina = true) => {
+  try {
+    const { data } = await api.post(`/pedidos/${pedidoId}/anular`, { motivo, avisarCocina });
+    return mapPedido(data);
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, 'No se pudo anular el pedido'));
   }
 };
 

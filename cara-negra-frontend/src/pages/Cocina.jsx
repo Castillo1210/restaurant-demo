@@ -3,14 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChefHat, Clock, CheckCircle2, Circle, Flame, Volume2, VolumeX, Maximize, Minimize,
-  LogOut, ChevronLeft, Wifi, WifiOff, StickyNote, Printer,
+  LogOut, ChevronLeft, Wifi, WifiOff, StickyNote, Printer, MessageSquareText,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { useClock } from '../hooks/useClock';
 import { getPedidosCocina, cambiarEstadoItem, cambiarEstadoPedidoCocina } from '../services/cocinaService';
-import { connectPedidosHub, onHubEvent } from '../services/signalrService';
+import { connectPedidosHub, onHubEvent, onHubConnectionState } from '../services/signalrService';
 import { parseFechaUtc } from '../utils/documentos';
+import { etiquetaMesa, salonTieneNombreCompuesto } from '../utils/mesaLabel';
 
 /**
  * Pantalla de cocina (KDS) en tiempo real.
@@ -70,7 +71,7 @@ const minutosDesde = (fecha, ahora) => {
 const estiloTiempo = (min) => {
   if (min >= MINUTOS_CRITICO) return 'bg-red-600 text-white animate-pulse';
   if (min >= MINUTOS_ALERTA) return 'bg-accentYellow text-black';
-  return 'bg-white/10 text-gray-200';
+  return 'bg-gray-50/10 text-gray-200';
 };
 
 function IconoEstadoItem({ estado }) {
@@ -99,7 +100,10 @@ function TarjetaPedido({ pedido, ahora, esNuevo, ocupado, onItem, onPedido }) {
       {/* Encabezado */}
       <div className="px-4 pt-3 pb-2 flex items-start justify-between gap-2 border-b border-gray-800/80">
         <div>
-          <p className="text-2xl font-black tracking-tight leading-none">Mesa {pedido.mesaNumero}</p>
+          <p className="text-2xl font-black tracking-tight leading-none">{etiquetaMesa(pedido.salonNombre, pedido.mesaNumero)}</p>
+          {salonTieneNombreCompuesto(pedido.salonNombre) && (
+            <p className="text-[11px] font-bold uppercase tracking-wider text-accentGreen mt-1">{pedido.salonNombre}</p>
+          )}
           <p className="text-xs text-gray-500 mt-1">
             #{pedido.pedidoId} · {pedido.mozoNombre?.split(' ')[0]} ·{' '}
             {creado?.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}
@@ -112,6 +116,14 @@ function TarjetaPedido({ pedido, ahora, esNuevo, ocupado, onItem, onPedido }) {
           {esNuevo && <span className="text-[10px] font-black text-accentYellow tracking-widest">¡NUEVO!</span>}
         </div>
       </div>
+
+      {/* Comentario general del pedido ("todo para llevar"): lo primero que se lee */}
+      {pedido.comentario && (
+        <div className="mx-2 mt-2 px-3 py-2 rounded-lg bg-amber-950/60 border border-amber-700/60 flex items-start gap-2">
+          <MessageSquareText size={16} className="text-amber-400 mt-0.5 flex-shrink-0" />
+          <p className="text-base font-extrabold text-amber-200 leading-snug break-words">{pedido.comentario}</p>
+        </div>
+      )}
 
       {/* Ítems */}
       <div className="p-2 space-y-1">
@@ -129,7 +141,7 @@ function TarjetaPedido({ pedido, ahora, esNuevo, ocupado, onItem, onPedido }) {
             >
               <IconoEstadoItem estado={item.estado} />
               <div className="flex-1 min-w-0">
-                <p className={`text-lg font-bold leading-tight ${item.estado === 'Listo' ? 'line-through text-gray-500' : 'text-white'}`}>
+                <p className={`text-lg font-bold leading-tight ${item.estado === 'Listo' ? 'line-through text-gray-500' : 'text-ink'}`}>
                   <span className="text-primary font-black mr-1.5">{item.cantidad}×</span>
                   {item.productoNombre}
                   {esAdicional && (
@@ -219,21 +231,21 @@ export default function Cocina() {
 
   // Tiempo real
   useEffect(() => {
-    let unsubs = [];
-    connectPedidosHub().then((connection) => {
-      setConectado(!!connection);
-      if (!connection) return;
-
-      connection.onreconnecting?.(() => setConectado(false));
-      connection.onreconnected?.(() => {
-        setConectado(true);
-        cargar();
-      });
-
-      unsubs = [
+    connectPedidosHub();
+    let estabaConectado = false;
+    const unsubs = [
+        onHubConnectionState((ok) => {
+          setConectado(ok);
+          // Al recuperar la conexión se recarga por si se perdió algún evento mientras tanto.
+          if (ok && !estabaConectado) cargar();
+          estabaConectado = ok;
+        }),
         onHubEvent('NuevoPedido', (evento) => {
           if (sonidoRef.current) reproducirAviso();
-          toast(`Nuevo pedido · Mesa ${evento?.mesaNumero ?? ''}`, { icon: '🔔' });
+          toast(`Nuevo pedido · ${etiquetaMesa(evento?.salonNombre, evento?.mesaNumero)}`, {
+            id: `nuevo-pedido-${evento?.pedidoId}`,
+            icon: '🔔',
+          });
           const id = evento?.pedidoId;
           if (id) {
             setNuevos((prev) => new Set(prev).add(id));
@@ -249,14 +261,16 @@ export default function Cocina() {
         }),
         onHubEvent('PedidoActualizado', (evento) => {
           if (sonidoRef.current) reproducirAviso();
-          toast(`Mesa ${evento?.mesaNumero ?? ''}: pedido modificado`, { icon: '✏️' });
+          toast(`${etiquetaMesa(evento?.salonNombre, evento?.mesaNumero)}: pedido modificado`, {
+            id: `pedido-modificado-${evento?.pedidoId}`,
+            icon: '✏️',
+          });
           refrescar();
         }),
         onHubEvent('PedidoEstadoCambiado', refrescar),
         onHubEvent('DetalleEstadoCambiado', refrescar),
         onHubEvent('PagoRecibido', refrescar),
-      ];
-    });
+    ];
     return () => unsubs.forEach((u) => u());
   }, [cargar, refrescar]);
 
@@ -315,9 +329,9 @@ export default function Cocina() {
   const esAdmin = user?.rol === 'ADMIN';
 
   return (
-    <div className="min-h-screen bg-[#070707] text-white flex flex-col">
+    <div className="min-h-screen bg-background text-ink flex flex-col">
       {/* Barra superior */}
-      <header className="px-4 sm:px-6 py-3 flex items-center gap-3 border-b border-gray-800/80 bg-black/60 sticky top-0 z-20 backdrop-blur">
+      <header className="px-4 sm:px-6 py-3 flex items-center gap-3 border-b border-gray-800/80 bg-background/80 sticky top-0 z-20 backdrop-blur">
         {esAdmin && (
           <button onClick={() => navigate('/admin')} className="p-2 rounded-full bg-card border border-gray-800 hover:bg-cardHighlight" title="Volver">
             <ChevronLeft size={20} />
@@ -357,7 +371,7 @@ export default function Cocina() {
             <section key={col.estado} className={`rounded-3xl border ${col.borde} ${col.fondo} flex flex-col min-h-[30vh] md:min-h-0`}>
               <div className="px-4 py-3 flex items-center justify-between">
                 <h2 className={`text-lg font-black uppercase tracking-wide ${col.color}`}>{col.titulo}</h2>
-                <span className={`min-w-8 h-8 px-2 rounded-full flex items-center justify-center text-base font-black bg-black/40 ${col.color}`}>
+                <span className={`min-w-8 h-8 px-2 rounded-full flex items-center justify-center text-base font-black bg-gray-950/40 ${col.color}`}>
                   {lista.length}
                 </span>
               </div>

@@ -66,6 +66,71 @@ namespace CaraNegra.Infrastructure.Migrations
                     b.ToTable("Articulos");
                 });
 
+            modelBuilder.Entity("CaraNegra.Domain.Entities.CambioPrecioPedido", b =>
+                {
+                    b.Property<int>("CambioPrecioPedidoId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("CambioPrecioPedidoId"));
+
+                    b.Property<DateTime>("CambiadoEn")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("Cantidad")
+                        .HasColumnType("int");
+
+                    b.Property<int>("DetallePedidoId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("JornadaId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Mesa")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("varchar(60)");
+
+                    b.Property<string>("Motivo")
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<int>("PedidoId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("PrecioAnterior")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<decimal>("PrecioNuevo")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<string>("ProductoNombre")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)");
+
+                    b.Property<int>("UsuarioId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("UsuarioNombre")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("UsuarioRol")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.HasKey("CambioPrecioPedidoId");
+
+                    b.HasIndex("JornadaId");
+
+                    b.HasIndex("PedidoId");
+
+                    b.ToTable("CambiosPrecioPedido", (string)null);
+                });
+
             modelBuilder.Entity("CaraNegra.Domain.Entities.Categoria", b =>
                 {
                     b.Property<int>("CategoriaId")
@@ -94,6 +159,254 @@ namespace CaraNegra.Infrastructure.Migrations
                     b.HasKey("CategoriaId");
 
                     b.ToTable("Categorias");
+                });
+
+            modelBuilder.Entity("CaraNegra.Domain.Entities.Cliente", b =>
+                {
+                    b.Property<int>("ClienteId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("ClienteId"));
+
+                    b.Property<DateTime?>("ActualizadoEn")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("CreadoEn")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Direccion")
+                        .HasMaxLength(300)
+                        .HasColumnType("varchar(300)");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<string>("NumeroDocumento")
+                        .IsRequired()
+                        .HasMaxLength(15)
+                        .HasColumnType("varchar(15)");
+
+                    b.Property<string>("TipoDocumento")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.HasKey("ClienteId");
+
+                    b.HasIndex("TipoDocumento", "NumeroDocumento")
+                        .IsUnique();
+
+                    b.ToTable("Clientes");
+                });
+
+            modelBuilder.Entity("CaraNegra.Domain.Entities.Comprobante", b =>
+                {
+                    b.Property<int>("ComprobanteId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("ComprobanteId"));
+
+                    b.Property<DateTime?>("ActualizadoEn")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Ambiente")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(12)
+                        .HasColumnType("varchar(12)")
+                        .HasDefaultValue("SIMULADO");
+
+                    b.Property<string>("CdrUrl")
+                        .HasMaxLength(300)
+                        .HasColumnType("varchar(300)");
+
+                    b.Property<string>("ClienteDireccion")
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<string>("ClienteNombre")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)");
+
+                    b.Property<string>("ClienteNumeroDocumento")
+                        .HasMaxLength(15)
+                        .HasColumnType("varchar(15)");
+
+                    b.Property<string>("ClienteTipoDocumento")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<int>("Correlativo")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreadoEn")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<decimal>("Descuento")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<string>("EmisorDireccion")
+                        .HasMaxLength(250)
+                        .HasColumnType("varchar(250)");
+
+                    b.Property<string>("EmisorNombreComercial")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("EmisorRazonSocial")
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<string>("EmisorRuc")
+                        .HasMaxLength(11)
+                        .HasColumnType("varchar(11)");
+
+                    b.Property<bool>("EsSimulacion")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Estado")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<DateTime>("FechaEmision")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("HashResumen")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<decimal>("Igv")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<decimal>("IgvPorcentaje")
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<int>("IntentosEnvio")
+                        .HasColumnType("int");
+
+                    b.Property<string>("MensajeSunat")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<decimal>("OpGravada")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<string>("PdfUrl")
+                        .HasMaxLength(300)
+                        .HasColumnType("varchar(300)");
+
+                    b.Property<int>("PedidoId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Serie")
+                        .IsRequired()
+                        .HasMaxLength(4)
+                        .HasColumnType("varchar(4)");
+
+                    b.Property<string>("TipoComprobante")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<decimal>("Total")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<DateTime?>("UltimoEnvioEn")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("UsuarioId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("XmlUrl")
+                        .HasMaxLength(300)
+                        .HasColumnType("varchar(300)");
+
+                    b.HasKey("ComprobanteId");
+
+                    b.HasIndex("Estado");
+
+                    b.HasIndex("FechaEmision");
+
+                    b.HasIndex("PedidoId");
+
+                    b.HasIndex("UsuarioId");
+
+                    b.HasIndex("Serie", "Correlativo")
+                        .IsUnique();
+
+                    b.ToTable("Comprobantes");
+                });
+
+            modelBuilder.Entity("CaraNegra.Domain.Entities.ConfiguracionEmpresa", b =>
+                {
+                    b.Property<int>("ConfiguracionEmpresaId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ActualizadoEn")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("CreadoEn")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Direccion")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("varchar(250)");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<decimal>("IgvPorcentaje")
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<string>("LogoBase64")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("MensajePie")
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<string>("NombreComercial")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("RazonSocial")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<string>("Ruc")
+                        .IsRequired()
+                        .HasMaxLength(11)
+                        .HasColumnType("varchar(11)");
+
+                    b.Property<string>("SerieBoleta")
+                        .IsRequired()
+                        .HasMaxLength(4)
+                        .HasColumnType("varchar(4)");
+
+                    b.Property<string>("SerieFactura")
+                        .IsRequired()
+                        .HasMaxLength(4)
+                        .HasColumnType("varchar(4)");
+
+                    b.Property<string>("Telefono")
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)");
+
+                    b.HasKey("ConfiguracionEmpresaId");
+
+                    b.ToTable("ConfiguracionEmpresa", (string)null);
                 });
 
             modelBuilder.Entity("CaraNegra.Domain.Entities.Crema", b =>
@@ -233,6 +546,179 @@ namespace CaraNegra.Infrastructure.Migrations
                     b.ToTable("DetallesPedido");
                 });
 
+            modelBuilder.Entity("CaraNegra.Domain.Entities.DispositivoAutorizado", b =>
+                {
+                    b.Property<int>("DispositivoAutorizadoId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("DispositivoAutorizadoId"));
+
+                    b.Property<DateTime?>("ActualizadoEn")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("CierreInactividadMinutos")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreadoEn")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("varchar(60)");
+
+                    b.Property<string>("RegistradoPor")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<DateTime?>("UltimoUsoEn")
+                        .HasColumnType("datetime(6)");
+
+                    b.HasKey("DispositivoAutorizadoId");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.ToTable("DispositivosAutorizados", (string)null);
+                });
+
+            modelBuilder.Entity("CaraNegra.Domain.Entities.Jornada", b =>
+                {
+                    b.Property<int>("JornadaId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("JornadaId"));
+
+                    b.Property<DateTime>("AbiertaEn")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("AbiertaPor")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<int>("AbiertaPorUsuarioId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ActualizadoEn")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("CantidadPedidos")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("CerradaEn")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("CerradaPor")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<int?>("CerradaPorUsuarioId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreadoEn")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<decimal>("DiferenciaTotal")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<decimal>("EfectivoContado")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<decimal>("EfectivoEsperado")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<string>("Estado")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("varchar(10)");
+
+                    b.Property<DateTime>("FechaOperativa")
+                        .HasColumnType("date");
+
+                    b.Property<decimal>("FondoInicial")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<string>("ObservacionApertura")
+                        .HasMaxLength(300)
+                        .HasColumnType("varchar(300)");
+
+                    b.Property<string>("ObservacionCierre")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)");
+
+                    b.Property<decimal>("TotalEgresos")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<decimal>("TotalIngresos")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<decimal>("TotalVentas")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.HasKey("JornadaId");
+
+                    b.HasIndex("Estado");
+
+                    b.HasIndex("FechaOperativa");
+
+                    b.ToTable("Jornadas", (string)null);
+                });
+
+            modelBuilder.Entity("CaraNegra.Domain.Entities.JornadaArqueo", b =>
+                {
+                    b.Property<int>("JornadaArqueoId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("JornadaArqueoId"));
+
+                    b.Property<DateTime?>("ActualizadoEn")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<decimal>("Contado")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<DateTime>("CreadoEn")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<decimal>("Diferencia")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<bool>("EsEfectivo")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<decimal>("Esperado")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<int>("JornadaId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("MetodoPago")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<int?>("MetodoPagoId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Ventas")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.HasKey("JornadaArqueoId");
+
+                    b.HasIndex("JornadaId");
+
+                    b.ToTable("JornadaArqueos", (string)null);
+                });
+
             modelBuilder.Entity("CaraNegra.Domain.Entities.Mesa", b =>
                 {
                     b.Property<int>("MesaId")
@@ -255,9 +741,12 @@ namespace CaraNegra.Infrastructure.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("varchar(20)");
 
+                    b.Property<int?>("SalonId")
+                        .HasColumnType("int");
+
                     b.HasKey("MesaId");
 
-                    b.HasIndex("NumeroMesa")
+                    b.HasIndex("SalonId", "NumeroMesa")
                         .IsUnique();
 
                     b.ToTable("Mesas");
@@ -336,6 +825,61 @@ namespace CaraNegra.Infrastructure.Migrations
                     b.ToTable("MovimientosArticulo");
                 });
 
+            modelBuilder.Entity("CaraNegra.Domain.Entities.MovimientoCaja", b =>
+                {
+                    b.Property<int>("MovimientoCajaId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("MovimientoCajaId"));
+
+                    b.Property<DateTime?>("ActualizadoEn")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("AnuladoEn")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("AnuladoPor")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<DateTime>("CreadoEn")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<bool>("EstaAnulado")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<int>("JornadaId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Monto")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<string>("Motivo")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<string>("RegistradoPor")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("Tipo")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("varchar(10)");
+
+                    b.Property<int>("UsuarioId")
+                        .HasColumnType("int");
+
+                    b.HasKey("MovimientoCajaId");
+
+                    b.HasIndex("JornadaId");
+
+                    b.ToTable("MovimientosCaja", (string)null);
+                });
+
             modelBuilder.Entity("CaraNegra.Domain.Entities.Pago", b =>
                 {
                     b.Property<int>("PagoId")
@@ -359,6 +903,9 @@ namespace CaraNegra.Infrastructure.Migrations
                     b.Property<bool>("EstaAnulado")
                         .HasColumnType("tinyint(1)");
 
+                    b.Property<int?>("JornadaId")
+                        .HasColumnType("int");
+
                     b.Property<int>("MetodoPagoId")
                         .HasColumnType("int");
 
@@ -378,6 +925,8 @@ namespace CaraNegra.Infrastructure.Migrations
 
                     b.HasKey("PagoId");
 
+                    b.HasIndex("JornadaId");
+
                     b.HasIndex("MetodoPagoId");
 
                     b.HasIndex("PedidoId");
@@ -396,10 +945,17 @@ namespace CaraNegra.Infrastructure.Migrations
                     b.Property<DateTime?>("ActualizadoEn")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<string>("Comentario")
+                        .HasMaxLength(300)
+                        .HasColumnType("varchar(300)");
+
                     b.Property<DateTime>("CreadoEn")
                         .HasColumnType("datetime(6)");
 
                     b.Property<int>("EstadoPedido")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("JornadaId")
                         .HasColumnType("int");
 
                     b.Property<int>("MesaId")
@@ -415,6 +971,8 @@ namespace CaraNegra.Infrastructure.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("PedidoId");
+
+                    b.HasIndex("JornadaId");
 
                     b.HasIndex("MesaId");
 
@@ -446,6 +1004,9 @@ namespace CaraNegra.Infrastructure.Migrations
                     b.Property<bool>("EstaDisponible")
                         .HasColumnType("tinyint(1)");
 
+                    b.Property<int>("ImagenVersion")
+                        .HasColumnType("int");
+
                     b.Property<string>("Nombre")
                         .IsRequired()
                         .HasColumnType("longtext");
@@ -462,6 +1023,99 @@ namespace CaraNegra.Infrastructure.Migrations
                     b.HasIndex("CategoriaId");
 
                     b.ToTable("Productos");
+                });
+
+            modelBuilder.Entity("CaraNegra.Domain.Entities.ProductoAnulado", b =>
+                {
+                    b.Property<int>("ProductoAnuladoId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("ProductoAnuladoId"));
+
+                    b.Property<DateTime>("AnuladoEn")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<int>("Cantidad")
+                        .HasColumnType("int");
+
+                    b.Property<string>("EstadoItem")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.Property<decimal>("Importe")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<int?>("JornadaId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Mesa")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("varchar(60)");
+
+                    b.Property<string>("Motivo")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<int>("PedidoId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("PrecioUnitario")
+                        .HasColumnType("decimal(10,2)");
+
+                    b.Property<int>("ProductoId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ProductoNombre")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("varchar(150)");
+
+                    b.Property<int>("UsuarioId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("UsuarioNombre")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<string>("UsuarioRol")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)");
+
+                    b.HasKey("ProductoAnuladoId");
+
+                    b.HasIndex("JornadaId");
+
+                    b.HasIndex("PedidoId");
+
+                    b.ToTable("ProductosAnulados", (string)null);
+                });
+
+            modelBuilder.Entity("CaraNegra.Domain.Entities.ProductoImagen", b =>
+                {
+                    b.Property<int>("ProductoId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("ActualizadoEn")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<byte[]>("Datos")
+                        .IsRequired()
+                        .HasColumnType("mediumblob");
+
+                    b.Property<string>("TipoContenido")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("varchar(30)");
+
+                    b.HasKey("ProductoId");
+
+                    b.ToTable("ProductoImagenes", (string)null);
                 });
 
             modelBuilder.Entity("CaraNegra.Domain.Entities.Rol", b =>
@@ -489,6 +1143,43 @@ namespace CaraNegra.Infrastructure.Migrations
                     b.HasKey("RolId");
 
                     b.ToTable("Roles");
+                });
+
+            modelBuilder.Entity("CaraNegra.Domain.Entities.Salon", b =>
+                {
+                    b.Property<int>("SalonId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("SalonId"));
+
+                    b.Property<DateTime?>("ActualizadoEn")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime>("CreadoEn")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Descripcion")
+                        .HasMaxLength(200)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<bool>("EstaActivo")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<int>("Orden")
+                        .HasColumnType("int");
+
+                    b.HasKey("SalonId");
+
+                    b.HasIndex("Nombre")
+                        .IsUnique();
+
+                    b.ToTable("Salones");
                 });
 
             modelBuilder.Entity("CaraNegra.Domain.Entities.Usuario", b =>
@@ -520,6 +1211,16 @@ namespace CaraNegra.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("longtext");
 
+                    b.Property<DateTime?>("PinBloqueadoHasta")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("PinHash")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)");
+
+                    b.Property<int>("PinIntentosFallidos")
+                        .HasColumnType("int");
+
                     b.Property<int>("RolId")
                         .HasColumnType("int");
 
@@ -545,6 +1246,36 @@ namespace CaraNegra.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Categoria");
+                });
+
+            modelBuilder.Entity("CaraNegra.Domain.Entities.CambioPrecioPedido", b =>
+                {
+                    b.HasOne("CaraNegra.Domain.Entities.Pedido", "Pedido")
+                        .WithMany()
+                        .HasForeignKey("PedidoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Pedido");
+                });
+
+            modelBuilder.Entity("CaraNegra.Domain.Entities.Comprobante", b =>
+                {
+                    b.HasOne("CaraNegra.Domain.Entities.Pedido", "Pedido")
+                        .WithMany("Comprobantes")
+                        .HasForeignKey("PedidoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("CaraNegra.Domain.Entities.Usuario", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("UsuarioId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Pedido");
+
+                    b.Navigation("Usuario");
                 });
 
             modelBuilder.Entity("CaraNegra.Domain.Entities.DetalleDescuento", b =>
@@ -585,6 +1316,27 @@ namespace CaraNegra.Infrastructure.Migrations
                     b.Navigation("Producto");
                 });
 
+            modelBuilder.Entity("CaraNegra.Domain.Entities.JornadaArqueo", b =>
+                {
+                    b.HasOne("CaraNegra.Domain.Entities.Jornada", "Jornada")
+                        .WithMany("Arqueos")
+                        .HasForeignKey("JornadaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Jornada");
+                });
+
+            modelBuilder.Entity("CaraNegra.Domain.Entities.Mesa", b =>
+                {
+                    b.HasOne("CaraNegra.Domain.Entities.Salon", "Salon")
+                        .WithMany("Mesas")
+                        .HasForeignKey("SalonId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Salon");
+                });
+
             modelBuilder.Entity("CaraNegra.Domain.Entities.MovimientoArticulo", b =>
                 {
                     b.HasOne("CaraNegra.Domain.Entities.Articulo", "Articulo")
@@ -604,8 +1356,24 @@ namespace CaraNegra.Infrastructure.Migrations
                     b.Navigation("Usuario");
                 });
 
+            modelBuilder.Entity("CaraNegra.Domain.Entities.MovimientoCaja", b =>
+                {
+                    b.HasOne("CaraNegra.Domain.Entities.Jornada", "Jornada")
+                        .WithMany("Movimientos")
+                        .HasForeignKey("JornadaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Jornada");
+                });
+
             modelBuilder.Entity("CaraNegra.Domain.Entities.Pago", b =>
                 {
+                    b.HasOne("CaraNegra.Domain.Entities.Jornada", null)
+                        .WithMany()
+                        .HasForeignKey("JornadaId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("CaraNegra.Domain.Entities.MetodoPago", "MetodoPago")
                         .WithMany("Pagos")
                         .HasForeignKey("MetodoPagoId")
@@ -625,6 +1393,11 @@ namespace CaraNegra.Infrastructure.Migrations
 
             modelBuilder.Entity("CaraNegra.Domain.Entities.Pedido", b =>
                 {
+                    b.HasOne("CaraNegra.Domain.Entities.Jornada", null)
+                        .WithMany()
+                        .HasForeignKey("JornadaId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("CaraNegra.Domain.Entities.Mesa", "Mesa")
                         .WithMany("Pedidos")
                         .HasForeignKey("MesaId")
@@ -651,6 +1424,28 @@ namespace CaraNegra.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Categoria");
+                });
+
+            modelBuilder.Entity("CaraNegra.Domain.Entities.ProductoAnulado", b =>
+                {
+                    b.HasOne("CaraNegra.Domain.Entities.Pedido", "Pedido")
+                        .WithMany()
+                        .HasForeignKey("PedidoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Pedido");
+                });
+
+            modelBuilder.Entity("CaraNegra.Domain.Entities.ProductoImagen", b =>
+                {
+                    b.HasOne("CaraNegra.Domain.Entities.Producto", "Producto")
+                        .WithOne()
+                        .HasForeignKey("CaraNegra.Domain.Entities.ProductoImagen", "ProductoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Producto");
                 });
 
             modelBuilder.Entity("CaraNegra.Domain.Entities.Usuario", b =>
@@ -681,6 +1476,13 @@ namespace CaraNegra.Infrastructure.Migrations
                     b.Navigation("DetallesDescuentos");
                 });
 
+            modelBuilder.Entity("CaraNegra.Domain.Entities.Jornada", b =>
+                {
+                    b.Navigation("Arqueos");
+
+                    b.Navigation("Movimientos");
+                });
+
             modelBuilder.Entity("CaraNegra.Domain.Entities.Mesa", b =>
                 {
                     b.Navigation("Pedidos");
@@ -693,6 +1495,8 @@ namespace CaraNegra.Infrastructure.Migrations
 
             modelBuilder.Entity("CaraNegra.Domain.Entities.Pedido", b =>
                 {
+                    b.Navigation("Comprobantes");
+
                     b.Navigation("DetallesDescuentos");
 
                     b.Navigation("DetallesPedidos");
@@ -708,6 +1512,11 @@ namespace CaraNegra.Infrastructure.Migrations
             modelBuilder.Entity("CaraNegra.Domain.Entities.Rol", b =>
                 {
                     b.Navigation("Usuarios");
+                });
+
+            modelBuilder.Entity("CaraNegra.Domain.Entities.Salon", b =>
+                {
+                    b.Navigation("Mesas");
                 });
 
             modelBuilder.Entity("CaraNegra.Domain.Entities.Usuario", b =>

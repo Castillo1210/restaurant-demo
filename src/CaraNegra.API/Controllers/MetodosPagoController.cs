@@ -33,15 +33,8 @@ public class MetodosPagoController : ControllerBase
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(int id)
     {
-        try
-        {
-            var result = await _mediator.Send(new GetMetodoPagoByIdQuery(id));
-            return Ok(result);
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { mensaje = ex.Message });
-        }
+        var result = await _mediator.Send(new GetMetodoPagoByIdQuery(id));
+        return Ok(result);
     }
 
     [HttpPost]
@@ -56,29 +49,15 @@ public class MetodosPagoController : ControllerBase
     [Authorize(Roles = "ADMIN")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateMetodoPagoDto dto)
     {
-        try
-        {
-            var result = await _mediator.Send(new UpdateMetodoPagoCommand(id, dto));
-            return Ok(result);
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { mensaje = ex.Message });
-        }
+        var result = await _mediator.Send(new UpdateMetodoPagoCommand(id, dto));
+        return Ok(result);
     }
 
     [HttpDelete("{id}")]
     [Authorize(Roles = "ADMIN")]
     public async Task<IActionResult> Delete(int id)
     {
-        try
-        {
-            await _mediator.Send(new DeleteMetodoPagoCommand(id));
-            return Ok(new { mensaje = "Método de pago desactivado correctamente." });
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { mensaje = ex.Message });
-        }
+        await _mediator.Send(new DeleteMetodoPagoCommand(id));
+        return Ok(new { mensaje = "Método de pago desactivado correctamente." });
     }
 }

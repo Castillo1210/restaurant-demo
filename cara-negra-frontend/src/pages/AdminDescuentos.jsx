@@ -147,7 +147,7 @@ export default function AdminDescuentos() {
         <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={abrirFormNueva}
-          className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border border-dashed border-gray-700 text-gray-400 hover:text-white hover:border-primary/50 transition-colors font-semibold text-sm"
+          className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border border-dashed border-gray-700 text-gray-400 hover:text-ink hover:border-primary/50 transition-colors font-semibold text-sm"
         >
           <Plus size={16} />
           Nuevo descuento
@@ -171,14 +171,14 @@ export default function AdminDescuentos() {
               >
                 <div className="flex justify-between items-start gap-3">
                   <div className="min-w-0">
-                    <p className="font-bold text-white text-sm truncate">{d.nombre}</p>
+                    <p className="font-bold text-ink text-sm truncate">{d.nombre}</p>
                     <p className="text-primary font-extrabold text-lg mt-0.5">{formatValor(d)}</p>
                     <p className="text-xs text-gray-500 mt-1">{formatVigencia(d)}</p>
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
                     <button
                       onClick={() => abrirFormEditar(d)}
-                      className="p-1.5 hover:bg-cardHighlight rounded-full text-gray-500 hover:text-white transition-colors"
+                      className="p-1.5 hover:bg-cardHighlight rounded-full text-gray-500 hover:text-ink transition-colors"
                       title="Editar"
                     >
                       <Pencil size={13} />
@@ -254,7 +254,7 @@ export default function AdminDescuentos() {
                     value={form.data.nombre}
                     onChange={(e) => setForm({ ...form, data: { ...form.data, nombre: e.target.value } })}
                     autoFocus
-                    className="w-full bg-background border border-gray-700/50 rounded-2xl px-4 py-3.5 text-white focus:outline-none focus:border-primary transition-colors text-sm"
+                    className="w-full bg-background border border-gray-700/50 rounded-2xl px-4 py-3.5 text-ink focus:outline-none focus:border-primary transition-colors text-sm"
                   />
                 </div>
 
@@ -299,7 +299,7 @@ export default function AdminDescuentos() {
                     max={form.data.esPorcentaje ? 100 : undefined}
                     value={form.data.valor}
                     onChange={(e) => setForm({ ...form, data: { ...form.data, valor: e.target.value } })}
-                    className="w-full bg-background border border-gray-700/50 rounded-2xl px-4 py-3.5 text-white text-lg font-bold focus:outline-none focus:border-primary transition-colors"
+                    className="w-full bg-background border border-gray-700/50 rounded-2xl px-4 py-3.5 text-ink text-lg font-bold focus:outline-none focus:border-primary transition-colors"
                   />
                 </div>
 
@@ -312,7 +312,7 @@ export default function AdminDescuentos() {
                       type="date"
                       value={form.data.fechaInicio}
                       onChange={(e) => setForm({ ...form, data: { ...form.data, fechaInicio: e.target.value } })}
-                      className="w-full bg-background border border-gray-700/50 rounded-2xl px-3 py-3.5 text-white focus:outline-none focus:border-primary transition-colors text-sm"
+                      className="w-full bg-background border border-gray-700/50 rounded-2xl px-3 py-3.5 text-ink focus:outline-none focus:border-primary transition-colors text-sm"
                     />
                   </div>
                   <div>
@@ -323,7 +323,7 @@ export default function AdminDescuentos() {
                       type="date"
                       value={form.data.fechaFin}
                       onChange={(e) => setForm({ ...form, data: { ...form.data, fechaFin: e.target.value } })}
-                      className="w-full bg-background border border-gray-700/50 rounded-2xl px-3 py-3.5 text-white focus:outline-none focus:border-primary transition-colors text-sm"
+                      className="w-full bg-background border border-gray-700/50 rounded-2xl px-3 py-3.5 text-ink focus:outline-none focus:border-primary transition-colors text-sm"
                     />
                   </div>
                 </div>

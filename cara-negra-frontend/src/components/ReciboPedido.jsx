@@ -1,14 +1,18 @@
 import { motion } from 'framer-motion';
 import { Printer, X, CheckCircle2 } from 'lucide-react';
 import { agruparDetallesPorProducto } from '../utils/agruparDetalles';
+import { etiquetaMesa } from '../utils/mesaLabel';
+import { useEmpresa } from '../context/EmpresaContext';
+import { imprimirTicket } from '../utils/imprimir';
 
 /**
  * Comprobante interno simple (no es un comprobante SUNAT/electrónico —
  * el usuario confirmó que por ahora basta con un recibo interno para
  * control de caja). Pensado para imprimirse desde el navegador
- * (window.print()) en una impresora térmica o de hoja normal.
+ * (utils/imprimir.imprimirTicket) en una impresora térmica o de hoja normal.
  */
 export default function ReciboPedido({ pedido, pagos, onClose }) {
+  const { nombreComercial, logo, mensajePie } = useEmpresa();
   if (!pedido) return null;
 
   const fecha = new Date().toLocaleString('es-PE', {
@@ -33,8 +37,7 @@ export default function ReciboPedido({ pedido, pagos, onClose }) {
         initial={{ opacity: 0, scale: 0.94, y: 16 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.94 }}
-        className="w-full max-w-sm bg-white text-black rounded-3xl overflow-hidden shadow-2xl print:rounded-none print:shadow-none print:max-w-full"
-        id="recibo-imprimible"
+        className="paleta-normal w-full max-w-sm bg-white text-black rounded-3xl overflow-hidden shadow-2xl print:rounded-none print:shadow-none print:max-w-full"
       >
         {/* Encabezado de éxito (no se imprime) */}
         <div className="bg-emerald-50 px-6 pt-6 pb-4 flex flex-col items-center border-b border-dashed border-gray-300 print:hidden">
@@ -43,9 +46,10 @@ export default function ReciboPedido({ pedido, pagos, onClose }) {
         </div>
 
         {/* Ticket */}
-        <div className="px-6 py-5 font-mono text-sm">
+        <div id="recibo-imprimible" className="ticket px-6 py-5 font-mono text-sm bg-white text-black">
           <div className="text-center mb-4">
-            <p className="font-extrabold text-base tracking-wide">CARA NEGRA</p>
+            {logo && <img src={logo} alt="" className="ticket-logo h-14 mx-auto mb-1 object-contain" />}
+            <p className="font-extrabold text-base tracking-wide uppercase">{nombreComercial}</p>
             <p className="text-xs text-gray-500">Comprobante interno de cobro</p>
             <p className="text-xs text-gray-500">(no válido como comprobante SUNAT)</p>
           </div>
@@ -54,7 +58,7 @@ export default function ReciboPedido({ pedido, pagos, onClose }) {
             <span>Pedido #{pedido.id}</span>
             <span>{fecha}</span>
           </div>
-          <div className="text-xs text-gray-600 mb-3">Mesa {pedido.mesaNumero}</div>
+          <div className="text-xs text-gray-600 mb-3">Mesa: {etiquetaMesa(pedido.salonNombre, pedido.mesaNumero)}</div>
 
           <div className="border-t border-dashed border-gray-300 my-2" />
 
@@ -109,7 +113,7 @@ export default function ReciboPedido({ pedido, pagos, onClose }) {
           </div>
 
           <div className="text-center text-xs text-gray-400 mt-5">
-            ¡Gracias por su visita!
+            {mensajePie || '¡Gracias por su visita!'}
           </div>
         </div>
 
@@ -123,7 +127,7 @@ export default function ReciboPedido({ pedido, pagos, onClose }) {
             Cerrar
           </button>
           <button
-            onClick={() => window.print()}
+            onClick={() => imprimirTicket('recibo-imprimible')}
             className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl bg-primary text-white font-bold text-sm hover:bg-primaryHover transition-colors"
           >
             <Printer size={16} />

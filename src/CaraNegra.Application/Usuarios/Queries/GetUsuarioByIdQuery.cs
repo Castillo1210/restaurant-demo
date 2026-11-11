@@ -29,7 +29,9 @@ public class GetUsuarioByIdQueryHandler : IRequestHandler<GetUsuarioByIdQuery, U
             RolNombre = usuario.Rol?.Nombre ?? string.Empty,
             EsVerificado = usuario.EsVerificado,
             UltimoAccesoEn = usuario.UltimoAccesoEn,
-            CreadoEn = usuario.CreadoEn
+            CreadoEn = usuario.CreadoEn,
+            TienePin = usuario.PinHash != null,
+            PinBloqueadoHasta = usuario.PinBloqueadoHasta > DateTime.UtcNow ? usuario.PinBloqueadoHasta : null
         };
     }
-}
+}

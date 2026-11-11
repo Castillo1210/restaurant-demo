@@ -19,7 +19,10 @@ public class Pago : BaseEntity
     public int PedidoId { get; set; }
     public int MetodoPagoId { get; set; }
 
+    /// <summary>Jornada (día operativo) en la que se registró. Null en datos anteriores a las jornadas.</summary>
+    public int? JornadaId { get; set; }
+
     // Propiedades de navegación
     public Pedido Pedido { get; set; } = null!;
     public MetodoPago MetodoPago { get; set; } = null!;
-}
+}

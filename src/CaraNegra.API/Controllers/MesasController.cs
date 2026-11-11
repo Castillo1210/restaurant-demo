@@ -21,10 +21,11 @@ public class MesasController : ControllerBase
     /// Obtiene todas las mesas
     /// </summary>
     /// <param name="soloDisponibles">Si true, solo retorna mesas con estado Disponible</param>
+    /// <param name="salonId">Filtra por salón (opcional)</param>
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] bool soloDisponibles = false)
+    public async Task<IActionResult> GetAll([FromQuery] bool soloDisponibles = false, [FromQuery] int? salonId = null)
     {
-        var result = await _mediator.Send(new GetAllMesasQuery(soloDisponibles));
+        var result = await _mediator.Send(new GetAllMesasQuery(soloDisponibles, salonId));
         return Ok(result);
     }
 
@@ -34,15 +35,8 @@ public class MesasController : ControllerBase
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(int id)
     {
-        try
-        {
-            var result = await _mediator.Send(new GetMesaByIdQuery(id));
-            return Ok(result);
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { mensaje = ex.Message });
-        }
+        var result = await _mediator.Send(new GetMesaByIdQuery(id));
+        return Ok(result);
     }
 
     /// <summary>
@@ -63,19 +57,8 @@ public class MesasController : ControllerBase
     [Authorize(Roles = "ADMIN")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateMesaDto dto)
     {
-        try
-        {
-            var result = await _mediator.Send(new UpdateMesaCommand(id, dto));
-            return Ok(result);
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { mensaje = ex.Message });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { mensaje = ex.Message });
-        }
+        var result = await _mediator.Send(new UpdateMesaCommand(id, dto));
+        return Ok(result);
     }
 
     /// <summary>
@@ -85,14 +68,7 @@ public class MesasController : ControllerBase
     [Authorize(Roles = "ADMIN")]
     public async Task<IActionResult> Delete(int id)
     {
-        try
-        {
-            await _mediator.Send(new DeleteMesaCommand(id));
-            return Ok(new { mensaje = "Mesa desactivada correctamente (estado: Mantenimiento)." });
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { mensaje = ex.Message });
-        }
+        await _mediator.Send(new DeleteMesaCommand(id));
+        return Ok(new { mensaje = "Mesa desactivada correctamente (estado: Mantenimiento)." });
     }
 }

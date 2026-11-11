@@ -1,5 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { getCurrentUser, logout as serviceLogout, login as serviceLogin } from '../services/authService';
+import {
+  getCurrentUser, logout as serviceLogout, login as serviceLogin, loginConPin as serviceLoginConPin,
+} from '../services/authService';
 import { setUnauthorizedHandler } from '../services/api';
 import { disconnectPedidosHub } from '../services/signalrService';
 
@@ -30,8 +32,14 @@ export function AuthProvider({ children }) {
     return auth;
   }, []);
 
+  const loginConPin = useCallback(async (usuarioId, pin) => {
+    const auth = await serviceLoginConPin(usuarioId, pin);
+    setUser(auth);
+    return auth;
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
+    <AuthContext.Provider value={{ user, login, loginConPin, logout }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,10 +1,10 @@
 // ============================================================
 //  comprobantesService.js — Boletas / facturas electrónicas
-//  DEMO: la emisión es SIMULADA en el backend (formato SUNAT,
-//  serie-correlativo, IGV y QR), sin envío real a SUNAT/OSE.
+//  Según el backend, la emisión es SIMULADA (demo) o se envía a
+//  APISUNAT (sandbox o producción). Ver utils/estadoComprobante.
 // ============================================================
 
-import api, { getApiErrorMessage } from './api';
+import api, { getApiErrorMessage, TIMEOUT_SUNAT_MS } from './api';
 
 /**
  * Emite la boleta o factura de un pedido ya pagado.
@@ -12,7 +12,7 @@ import api, { getApiErrorMessage } from './api';
  */
 export const emitirComprobante = async (payload) => {
   try {
-    const { data } = await api.post('/comprobantes', payload);
+    const { data } = await api.post('/comprobantes', payload, { timeout: TIMEOUT_SUNAT_MS });
     return data;
   } catch (error) {
     // Los errores de FluentValidation vienen como { errors: { Campo: [msg] } }.
@@ -42,5 +42,39 @@ export const getComprobanteById = async (id) => {
  */
 export const getComprobantes = async (params = {}) => {
   const { data } = await api.get('/comprobantes', { params });
+  return data;
+};
+
+/**
+ * Comprobantes emitidos hace más de una hora que SUNAT todavía no confirma.
+ * @returns {Promise<{cantidad:number, masAntiguo:string|null}>}
+ */
+export const getComprobantesAtrasados = async () => {
+  const { data } = await api.get('/comprobantes/atrasados');
+  return data;
+};
+
+/**
+ * Reintenta el envío a SUNAT (o consulta el estado) de un comprobante PorEnviar,
+ * Pendiente o con error de envío. Devuelve el comprobante actualizado.
+ */
+export const reenviarComprobante = async (id) => {
+  try {
+    const { data } = await api.post(`/comprobantes/${id}/reenviar`, null, { timeout: TIMEOUT_SUNAT_MS });
+    return data;
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, 'No se pudo reenviar el comprobante'));
+  }
+};
+
+/** Número que llevará el próximo comprobante de una serie: { serie, numero, texto: 'B001-00000015' }. */
+export const getProximoNumero = async (serie) => {
+  const { data } = await api.get('/comprobantes/proximo-numero', { params: { serie } });
+  return data;
+};
+
+/** Dónde se emiten los comprobantes: { proveedor: 'Simulado'|'ApiSunat', ambiente: 'SIMULADO'|'SANDBOX'|'PRODUCCION' }. */
+export const getAmbienteFacturacion = async () => {
+  const { data } = await api.get('/comprobantes/ambiente');
   return data;
 };

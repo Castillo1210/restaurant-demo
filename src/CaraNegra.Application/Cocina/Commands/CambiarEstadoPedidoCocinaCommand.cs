@@ -30,13 +30,16 @@ public class CambiarEstadoPedidoCocinaCommandHandler : IRequestHandler<CambiarEs
         if (request.Estado is not (EstadoPedido.EnPreparacion or EstadoPedido.Listo))
             throw new InvalidOperationException("Desde cocina solo se puede pasar un pedido a En preparación o Listo");
 
+        // Bloquea el pedido: si el mozo agrega platos mientras cocina lo marca, no se pisan.
+        await using var tx = await _context.IniciarTransaccionAsync(cancellationToken);
+        await _context.BloquearPedidoAsync(request.PedidoId, cancellationToken);
+
         var pedido = await _context.Pedidos
-            .Include(p => p.Mesa)
+            .Include(p => p.Mesa).ThenInclude(m => m.Salon)
             .Include(p => p.Usuario)
             .Include(p => p.DetallesPedidos)
                 .ThenInclude(d => d.Producto)
                     .ThenInclude(pr => pr.Categoria)
-            .AsSplitQuery()
             .FirstOrDefaultAsync(p => p.PedidoId == request.PedidoId, cancellationToken)
             ?? throw new KeyNotFoundException($"Pedido {request.PedidoId} no encontrado");
 
@@ -63,6 +66,7 @@ public class CambiarEstadoPedidoCocinaCommandHandler : IRequestHandler<CambiarEs
         pedido.EstadoPedido = CocinaEstadoHelper.CalcularEstadoPedido(pedido);
 
         await _context.SaveChangesAsync(cancellationToken);
+        await tx.ConfirmarAsync(cancellationToken);
 
         if (estadoAnterior != pedido.EstadoPedido)
         {
@@ -70,6 +74,7 @@ public class CambiarEstadoPedidoCocinaCommandHandler : IRequestHandler<CambiarEs
             {
                 PedidoId = pedido.PedidoId,
                 MesaNumero = pedido.Mesa?.NumeroMesa ?? string.Empty,
+                SalonNombre = pedido.Mesa?.Salon?.Nombre ?? string.Empty,
                 EstadoAnterior = estadoAnterior.ToString(),
                 EstadoNuevo = pedido.EstadoPedido.ToString(),
                 ActualizadoEn = DateTime.UtcNow

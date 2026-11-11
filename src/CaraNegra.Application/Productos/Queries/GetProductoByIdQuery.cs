@@ -30,7 +30,8 @@ public class GetProductoByIdQueryHandler : IRequestHandler<GetProductoByIdQuery,
             Tipo = producto.Tipo,
             CategoriaId = producto.CategoriaId,
             CategoriaNombre = producto.Categoria?.Nombre ?? string.Empty,
+            ImagenVersion = producto.ImagenVersion,
             CreadoEn = producto.CreadoEn
         };
     }
-}
+}

@@ -27,7 +27,7 @@ public class GetAllPedidosQueryHandler : IRequestHandler<GetAllPedidosQuery, Pag
     public async Task<PagedResult<PedidoDto>> Handle(GetAllPedidosQuery request, CancellationToken cancellationToken)
     {
         var query = _context.Pedidos
-            .Include(p => p.Mesa)
+            .Include(p => p.Mesa).ThenInclude(m => m.Salon)
             .Include(p => p.Usuario)
             .Include(p => p.DetallesPedidos)
                 .ThenInclude(d => d.Producto)
@@ -99,12 +99,14 @@ public class GetAllPedidosQueryHandler : IRequestHandler<GetAllPedidosQuery, Pag
         {
             PedidoId = pedido.PedidoId,
             MesaId = pedido.MesaId,
+            SalonNombre = pedido.Mesa?.Salon?.Nombre ?? string.Empty,
             MesaNumero = pedido.Mesa?.NumeroMesa ?? string.Empty,
             UsuarioId = pedido.UsuarioId,
             UsuarioNombre = pedido.Usuario?.NombreCompleto ?? string.Empty,
             SubTotal = pedido.SubTotal,
             Total = pedido.Total,
             EstadoPedido = pedido.EstadoPedido,
+            Comentario = pedido.Comentario,
             CreadoEn = pedido.CreadoEn,
             Descuento = MapDescuento(pedido),
             Detalles = pedido.DetallesPedidos.Select(d => new PedidoDetalleDto

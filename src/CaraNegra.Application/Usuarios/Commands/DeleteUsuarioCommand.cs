@@ -19,6 +19,9 @@ public class DeleteUsuarioCommandHandler : IRequestHandler<DeleteUsuarioCommand,
             .FirstOrDefaultAsync(u => u.UsuarioId == request.UsuarioId, cancellationToken)
             ?? throw new KeyNotFoundException($"Usuario {request.UsuarioId} no encontrado");
 
+        await UsuarioReglas.ExigirOtroAdminActivoSiDejaDeSerloAsync(_context, usuario,
+            seguiraSiendoAdmin: true, seguiraActivo: false, cancellationToken);
+
         // Soft delete: desactivar usuario
         usuario.EsVerificado = false;
         await _context.SaveChangesAsync(cancellationToken);

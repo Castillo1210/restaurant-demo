@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maqueta: cantidad y precio en línea</title>
+<style>
+  :root{--bg:#eef0f3;--card:#fff;--line:#e5e7eb;--ink:#111827;--muted:#6b7280;--soft:#9ca3af;--primary:#f47c20;--primary-soft:#fff3e8;--red:#dc2626;--red-soft:#fef2f2;--amber:#d97706;--amber-soft:#fffbeb}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+  header{max-width:1100px;margin:0 auto;padding:22px 16px 4px}
+  h1{font-size:20px;margin:0 0 4px}
+  header p{margin:0;color:var(--muted);font-size:14px;line-height:1.45}
+  .grid{max-width:1100px;margin:0 auto;padding:14px 16px 30px;display:flex;flex-wrap:wrap;gap:22px;justify-content:center}
+  .opcion{width:380px;max-width:100%;display:flex;flex-direction:column;gap:8px}
+  .titulo{font-weight:800;font-size:15px}
+  .titulo span{display:inline-block;background:var(--ink);color:#fff;border-radius:999px;font-size:11px;padding:2px 8px;margin-right:6px;vertical-align:1px}
+  .desc{font-size:13px;color:var(--muted);line-height:1.45;min-height:76px}
+  .tel{background:#f8f9fb;border:1px solid var(--line);border-radius:26px;padding:14px;box-shadow:0 6px 20px rgba(0,0,0,.06);position:relative;overflow:hidden}
+  .ancho{font-size:10px;color:var(--soft);text-align:center;margin-bottom:8px;letter-spacing:.04em}
+  .seccion{display:flex;justify-content:space-between;align-items:baseline;margin:4px 0 6px}
+  .seccion h3{margin:0;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--soft)}
+  .seccion.p h3,.seccion.p b{color:var(--primary)}
+  .seccion b{font-size:12px}
+  .coment{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--soft);border:1px dashed var(--line);border-radius:10px;padding:6px 10px;margin-bottom:10px}
+  .tachado{text-decoration:line-through;opacity:.55}
+  .quitado{font-size:10px;font-weight:800;color:var(--red);margin-left:auto;text-decoration:none}
+  /* Opción 1: tal cual */
+  .f1{display:flex;align-items:center;gap:4px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:6px 8px;margin-bottom:4px}
+  .f1 .c{width:18px;font-weight:800;font-size:14px}
+  .f1 .n{flex:1;min-width:0;font-size:14px;line-height:18px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .f1 .pr{font-weight:700;font-size:13px;white-space:nowrap}
+  .mini{width:24px;height:24px;border-radius:999px;border:1px solid var(--line);background:#fff;display:inline-flex;align-items:center;justify-content:center;color:var(--muted);padding:0;cursor:pointer;flex-shrink:0}
+  .ico{border:0;background:none;padding:3px;color:var(--soft);display:inline-flex;cursor:pointer;flex-shrink:0;border-radius:6px}
+  .ico:hover{color:var(--red);background:var(--red-soft)}
+  .apretado{outline:2px dashed #f59e0b;outline-offset:2px}
+  /* Opción 2: ajustada */
+  .f2{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:7px 10px;margin-bottom:5px}
+  .f2.edit{border-color:var(--primary)}
+  .top{display:flex;gap:8px;align-items:flex-start}
+  .top .n{flex:1;min-width:0;font-size:14px;line-height:20px}
+  .top .t{font-weight:700;font-size:14px;line-height:20px;white-space:nowrap}
+  .bot{display:flex;align-items:center;gap:10px;margin-top:4px}
+  .step{display:flex;align-items:center;gap:2px;background:#f9fafb;border:1px solid var(--line);border-radius:999px;padding:2px}
+  .step button{width:28px;height:28px;border-radius:999px;border:0;background:#fff;box-shadow:0 0 0 1px var(--line);font-size:17px;font-weight:700;color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .step button:disabled{opacity:.35;cursor:default}
+  .step .q{min-width:30px;padding:0 4px;text-align:center;font-weight:800;font-size:14px}
+  .step .q s{color:var(--soft);font-weight:600;margin-right:2px}
+  .precio{border:0;background:none;padding:3px 6px;border-radius:8px;font-size:12px;color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;gap:4px}
+  .precio:hover{background:var(--amber-soft);color:var(--amber)}
+  .precio svg{opacity:.55}
+  .edita{display:flex;align-items:center;gap:4px}
+  .edita input{width:78px;border:1px solid var(--primary);border-radius:8px;padding:4px 6px;font-size:13px;font-weight:700}
+  .ok,.no{width:26px;height:26px;border-radius:8px;border:0;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .ok{background:var(--primary);color:#fff}
+  .no{background:#f3f4f6;color:var(--muted)}
+  .sp{flex:1}
+  .confirma{margin-top:8px;border-top:1px dashed var(--line);padding-top:8px}
+  .confirma p{margin:0 0 6px;font-size:12px;color:var(--muted)}
+  .confirma p b{color:var(--red)}
+  .chips{display:flex;flex-wrap:wrap;gap:5px}
+  .chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 9px;font-size:11.5px;font-weight:600;color:var(--muted);cursor:pointer}
+  .chip:hover{border-color:var(--red);color:var(--red)}
+  .cancelar{border:0;background:none;color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;margin-top:6px;padding:2px 0}
+  .pe{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid #fbd5b5;border-radius:12px;padding:7px 10px;margin-bottom:4px;font-size:14px}
+  .pe b{width:18px}
+  .pe span{flex:1}
+  .vacio{font-size:12px;color:var(--soft);text-align:center;border:1px dashed var(--line);border-radius:12px;padding:12px}
+  .enviar{margin-top:10px;background:var(--primary);color:#fff;border-radius:16px;text-align:center;padding:11px;font-weight:800;font-size:14px}
+  .total{display:flex;justify-content:space-between;margin-top:10px;font-weight:800;font-size:14px}
+  .toast{position:absolute;left:12px;right:12px;bottom:12px;background:var(--ink);color:#fff;border-radius:14px;padding:10px 12px;font-size:12.5px;font-weight:600;z-index:5}
+  .nota{max-width:1100px;margin:0 auto;padding:0 16px 34px;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+  .nota div{background:#fff;border:1px solid var(--line);border-radius:16px;padding:12px 14px;font-size:13px;line-height:1.45;color:#374151}
+  .nota b{display:block;color:var(--ink);margin-bottom:3px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Maqueta 2 — “−” y “+”, precio en la misma fila, sin comentario</h1>
+  <p>Los dos paneles tienen el ancho de un celular (380 px), que es donde el espacio aprieta. Toca −, +, el precio y los motivos para probar.</p>
+</header>
+
+<div class="grid">
+  <div class="opcion">
+    <div class="titulo"><span>1</span>Tu idea tal cual (en una sola fila)</div>
+    <div class="desc">“−” antes del precio y “+” después, junto al lápiz y el tacho. En el celular no entra todo: el nombre se corta (“Chicharrón de Ch…”) y los botones quedan muy pegados para un dedo (zona marcada).</div>
+    <div class="tel" id="op1"></div>
+  </div>
+  <div class="opcion">
+    <div class="titulo"><span>2</span>Tu idea ajustada (dos líneas por plato)</div>
+    <div class="desc">Arriba el nombre completo y el importe; abajo <b>− 3 +</b>, el precio unitario (tócalo y se edita ahí mismo, sin ventana) y el tacho. Es el mismo diseño que ya usa “Por enviar”, así que se ve coherente.</div>
+    <div class="tel" id="op2"></div>
+  </div>
+</div>
+
+<div class="nota">
+  <div><b>“−” no abre ventana</b>Baja el número (3 → 2) y debajo aparecen los motivos en una línea. Un toque en el motivo confirma. El motivo se mantiene porque a cocina le sale “ANULADO” y queda registrado quién quitó.</div>
+  <div><b>“+” no imprime al instante</b>Agrega 1 unidad del mismo producto a “Por enviar”. Sale a cocina como ADICIONAL recién al tocar “Enviar”, así un toque accidental no imprime nada.</div>
+  <div><b>Precio en la misma fila</b>Tocar “S/ 11.00 c/u” lo convierte en una casilla; Enter o ✓ guarda, Esc o ✕ cancela. Solo cajero y administrador (como hoy). El motivo del cambio de precio pasa a ser opcional (ya lo es en el sistema).</div>
+  <div><b>Sin “Agregar comentario al pedido”</b>Se oculta el botón. Las notas por plato (“sin cebolla”) se mantienen; esas sí se usan.</div>
+</div>
+
+<script>
+const I = {
+  lapiz:'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>',
+  tacho:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>',
+  ok:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>',
+  x:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+  msg:'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
+};
+const MOTIVOS = ['Ya no lo quiere','Error al tomar','Se acabó'];
+const S = n => 'S/ ' + n.toFixed(2);
+const base = () => [
+  {id:1,n:'Cuy Chactado',c:1,p:55},
+  {id:2,n:'Chicharrón de Chancho',c:1,p:50},
+  {id:3,n:'Coca Kola 2 1/2 Litros',c:1,p:15},
+  {id:4,n:'Cerveza Pilsen',c:3,p:11},
+  {id:5,n:'Triple Tacneño',c:1,p:45},
+];
+
+// ---------- Opción 1: tal cual ----------
+(function(){
+  const el = document.getElementById('op1');
+  const items = base();
+  el.innerHTML = `<div class="ancho">ANCHO DE CELULAR · 380 px</div>
+    <div class="coment">${I.msg} Agregar comentario al pedido</div>
+    <div class="seccion"><h3>Ya enviado a cocina</h3><b>${S(items.reduce((a,d)=>a+d.c*d.p,0))}</b></div>
+    ${items.map((d,i)=>`<div class="f1"><span class="c">${d.c}</span><span class="n">${d.n}</span>
+      <span style="display:flex;align-items:center;gap:3px" class="${i===1?'apretado':''}">
+      <button class="mini">−</button><span class="pr">${S(d.c*d.p)}</span><button class="mini">+</button>
+      <button class="ico" style="color:var(--soft)">${I.lapiz}</button><button class="ico">${I.tacho}</button></span></div>`).join('')}
+    <div class="total"><span>Total de la mesa</span><span>${S(items.reduce((a,d)=>a+d.c*d.p,0))}</span></div>`;
+})();
+
+// ---------- Opción 2: ajustada ----------
+(function(){
+  const el = document.getElementById('op2');
+  let items = base(), porEnviar = [], quita = null, edita = null, toast = '';
+  const totalEnv = () => items.reduce((a,d)=>a+d.c*d.p,0);
+
+  function fila(d){
+    const q = quita && quita.id===d.id ? quita.q : d.c;
+    const enQuita = quita && quita.id===d.id;
+    const precio = edita && edita.id===d.id
+      ? `<span class="edita"><input id="inp" value="${edita.v}" inputmode="decimal"><button class="ok" data-a="guardar">${I.ok}</button><button class="no" data-a="noedit">${I.x}</button></span>`
+      : `<button class="precio" data-a="editar" data-id="${d.id}" title="Cambiar precio">${S(d.p)} c/u ${I.lapiz}</button>`;
+    return `<div class="f2 ${edita&&edita.id===d.id?'edit':''}">
+      <div class="top"><span class="n">${d.n}</span><span class="t">${S(q*d.p)}</span></div>
+      <div class="bot">
+        <div class="step"><button data-a="menos" data-id="${d.id}" ${q===0?'disabled':''}>−</button>
+          <span class="q">${enQuita?`<s>${d.c}</s>→ `:''}${q}</span>
+          <button data-a="mas" data-id="${d.id}" title="Agregar 1 a “Por enviar”">+</button></div>
+        ${precio}<span class="sp"></span>
+        <button class="ico" data-a="todo" data-id="${d.id}" title="Quitar del pedido">${I.tacho}</button>
+      </div>
+      ${enQuita?`<div class="confirma"><p>Quitar <b>${d.c-q}</b> · elige el motivo para confirmar (a cocina le sale ANULADO):</p>
+        <div class="chips">${MOTIVOS.map(m=>`<button class="chip" data-a="motivo" data-m="${m}">${m}</button>`).join('')}</div>
+        <button class="cancelar" data-a="cancelar">Cancelar</button></div>`:''}
+    </div>`;
+  }
+
+  function render(){
+    const tPE = porEnviar.reduce((a,d)=>a+d.c*d.p,0);
+    el.innerHTML = `<div class="ancho">ANCHO DE CELULAR · 380 px</div>
+      <div class="seccion"><h3>Ya enviado a cocina</h3><b>${S(totalEnv())}</b></div>
+      ${items.filter(d=>d.c>0).map(fila).join('')}
+      <div class="seccion p" style="margin-top:12px"><h3>Por enviar</h3>${tPE?`<b>${S(tPE)}</b>`:''}</div>
+      ${porEnviar.length?porEnviar.map(d=>`<div class="pe"><b>${d.c}</b><span>${d.n}</span><strong>${S(d.c*d.p)}</strong></div>`).join(''):'<div class="vacio">Toca los productos de la carta para agregarlos.</div>'}
+      ${porEnviar.length?'<div class="enviar">Enviar a cocina</div>':''}
+      <div class="total"><span>Total de la mesa</span><span>${S(totalEnv()+tPE)}</span></div>
+      ${toast?`<div class="toast">${toast}</div>`:''}`;
+    const inp = el.querySelector('#inp'); if(inp){ inp.focus(); inp.select(); }
+  }
+  function aviso(t){ toast=t; render(); clearTimeout(aviso.t); aviso.t=setTimeout(()=>{toast='';render();},2400); }
+
+  el.addEventListener('click', e=>{
+    const b = e.target.closest('[data-a]'); if(!b) return;
+    const a = b.dataset.a, id = Number(b.dataset.id), d = items.find(x=>x.id===id);
+    if(a==='menos'){ if(!quita||quita.id!==id) quita={id,q:d.c}; quita.q=Math.max(0,quita.q-1); edita=null; }
+    else if(a==='todo'){ quita={id,q:0}; edita=null; }
+    else if(a==='mas'){
+      if(quita&&quita.id===id){ quita.q++; if(quita.q>=d.c) quita=null; }
+      else { const x=porEnviar.find(p=>p.id===id); x?x.c++:porEnviar.push({id,n:d.n,p:d.p,c:1}); return aviso(`+1 ${d.n} en “Por enviar” (sale a cocina al tocar Enviar)`); }
+    }
+    else if(a==='motivo'){ const it=items.find(x=>x.id===quita.id); const n=it.c-quita.q; it.c=quita.q; quita=null; return aviso(`${n}x ${it.n} quitado · motivo: ${b.dataset.m} · aviso a cocina`); }
+    else if(a==='cancelar'){ quita=null; }
+    else if(a==='editar'){ edita={id,v:d.p.toFixed(2)}; quita=null; }
+    else if(a==='guardar'){ guardar(); return; }
+    else if(a==='noedit'){ edita=null; }
+    render();
+  });
+  function guardar(){
+    const v=parseFloat(String(el.querySelector('#inp').value).replace(',','.'));
+    const it=items.find(x=>x.id===edita.id); edita=null;
+    if(!(v>=0)) return render();
+    const antes=it.p; it.p=v; aviso(`${it.n}: precio ${S(antes)} → ${S(v)}`);
+  }
+  el.addEventListener('keydown', e=>{ if(e.target.id!=='inp') return; if(e.key==='Enter') guardar(); if(e.key==='Escape'){edita=null;render();} });
+  el.addEventListener('input', e=>{ if(e.target.id==='inp') edita.v=e.target.value; });
+  render();
+})();
+</script>
+</body>
+</html>

@@ -1,3 +1,4 @@
+using CaraNegra.Application.Auth.Pin;
 using CaraNegra.Application.Usuarios.Commands;
 using CaraNegra.Application.Usuarios.DTOs;
 using CaraNegra.Application.Usuarios.Queries;
@@ -46,15 +47,8 @@ public class UsuariosController : ControllerBase
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(int id)
     {
-        try
-        {
-            var result = await _mediator.Send(new GetUsuarioByIdQuery(id));
-            return Ok(result);
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { mensaje = ex.Message });
-        }
+        var result = await _mediator.Send(new GetUsuarioByIdQuery(id));
+        return Ok(result);
     }
 
     /// <summary>
@@ -73,15 +67,8 @@ public class UsuariosController : ControllerBase
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateUsuarioDto dto)
     {
-        try
-        {
-            var result = await _mediator.Send(new UpdateUsuarioCommand(id, dto));
-            return Ok(result);
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { mensaje = ex.Message });
-        }
+        var result = await _mediator.Send(new UpdateUsuarioCommand(id, dto));
+        return Ok(result);
     }
 
     /// <summary>
@@ -90,43 +77,34 @@ public class UsuariosController : ControllerBase
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id)
     {
-        try
-        {
-            await _mediator.Send(new DeleteUsuarioCommand(id));
-            return Ok(new { mensaje = "Usuario desactivado correctamente." });
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { mensaje = ex.Message });
-        }
+        await _mediator.Send(new DeleteUsuarioCommand(id));
+        return Ok(new { mensaje = "Usuario desactivado correctamente." });
     }
 
     /// <summary>
-    /// Cambia la contraseña del usuario autenticado
+    /// Asigna o cambia el PIN de 4 dígitos de un MOZO o COCINA (solo ADMIN). Desbloquea el PIN.
     /// </summary>
-    [HttpPost("{id}/cambiar-password")]
-    [Authorize(Roles = "ADMIN,CAJERO,MOZO,COCINA")] // Permitir a todos los roles cambiar su propia contraseña
-    public async Task<IActionResult> ChangePassword(int id, [FromBody] ChangePasswordDto dto)
+    [HttpPut("{id}/pin")]
+    public async Task<IActionResult> AsignarPin(int id, [FromBody] AsignarPinDto dto)
     {
-        // Validar que el usuario solo pueda cambiar su propia contraseña (excepto ADMIN)
-        if (!User.IsInRole("ADMIN") && int.Parse(User.FindFirst("usuarioId")?.Value ?? "0") != id)
-        {
-            return Forbid();
-        }
+        await _mediator.Send(new AsignarPinCommand(id, dto));
+        return Ok(new { mensaje = "PIN guardado." });
+    }
 
-        try
-        {
-            await _mediator.Send(new ChangePasswordCommand(id, dto));
-            return Ok(new { mensaje = "Contraseña cambiada correctamente." });
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { mensaje = ex.Message });
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            return BadRequest(new { mensaje = ex.Message });
-        }
+    /// <summary>Quita el PIN: el usuario vuelve a ingresar solo con contraseña.</summary>
+    [HttpDelete("{id}/pin")]
+    public async Task<IActionResult> QuitarPin(int id)
+    {
+        await _mediator.Send(new QuitarPinCommand(id));
+        return Ok(new { mensaje = "PIN eliminado." });
+    }
+
+    /// <summary>Desbloquea un PIN bloqueado por intentos fallidos.</summary>
+    [HttpPost("{id}/pin/desbloquear")]
+    public async Task<IActionResult> DesbloquearPin(int id)
+    {
+        await _mediator.Send(new DesbloquearPinCommand(id));
+        return Ok(new { mensaje = "PIN desbloqueado." });
     }
 
     /// <summary>
@@ -135,14 +113,7 @@ public class UsuariosController : ControllerBase
     [HttpPost("{id}/reset-password")]
     public async Task<IActionResult> ResetPassword(int id, [FromBody] ResetPasswordDto dto)
     {
-        try
-        {
-            await _mediator.Send(new ResetPasswordCommand(id, dto));
-            return Ok(new { mensaje = "Contraseña reseteada correctamente." });
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { mensaje = ex.Message });
-        }
+        await _mediator.Send(new ResetPasswordCommand(id, dto));
+        return Ok(new { mensaje = "Contraseña reseteada correctamente." });
     }
-}
+}

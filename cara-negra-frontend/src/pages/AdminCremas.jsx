@@ -116,7 +116,7 @@ export default function AdminCremas() {
         <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={abrirFormNueva}
-          className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border border-dashed border-gray-700 text-gray-400 hover:text-white hover:border-primary/50 transition-colors font-semibold text-sm"
+          className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border border-dashed border-gray-700 text-gray-400 hover:text-ink hover:border-primary/50 transition-colors font-semibold text-sm"
         >
           <Plus size={16} />
           Nueva crema
@@ -142,7 +142,7 @@ export default function AdminCremas() {
                   <button
                     onClick={() => mover(index, -1)}
                     disabled={index === 0 || busyId === c.id}
-                    className="p-0.5 text-gray-600 hover:text-white disabled:opacity-30 transition-colors"
+                    className="p-0.5 text-gray-600 hover:text-ink disabled:opacity-30 transition-colors"
                     title="Subir"
                   >
                     <ChevronUp size={14} />
@@ -150,19 +150,19 @@ export default function AdminCremas() {
                   <button
                     onClick={() => mover(index, 1)}
                     disabled={index === cremas.length - 1 || busyId === c.id}
-                    className="p-0.5 text-gray-600 hover:text-white disabled:opacity-30 transition-colors"
+                    className="p-0.5 text-gray-600 hover:text-ink disabled:opacity-30 transition-colors"
                     title="Bajar"
                   >
                     <ChevronDown size={14} />
                   </button>
                 </div>
 
-                <p className="flex-1 font-bold text-white text-sm truncate">{c.nombre}</p>
+                <p className="flex-1 font-bold text-ink text-sm truncate">{c.nombre}</p>
 
                 <div className="flex items-center gap-1 flex-shrink-0">
                   <button
                     onClick={() => abrirFormEditar(c)}
-                    className="p-1.5 hover:bg-cardHighlight rounded-full text-gray-500 hover:text-white transition-colors"
+                    className="p-1.5 hover:bg-cardHighlight rounded-full text-gray-500 hover:text-ink transition-colors"
                     title="Editar"
                   >
                     <Pencil size={13} />
@@ -236,7 +236,7 @@ export default function AdminCremas() {
                     value={form.data.nombre}
                     onChange={(e) => setForm({ ...form, data: { ...form.data, nombre: e.target.value } })}
                     autoFocus
-                    className="w-full bg-background border border-gray-700/50 rounded-2xl px-4 py-3.5 text-white focus:outline-none focus:border-primary transition-colors text-sm"
+                    className="w-full bg-background border border-gray-700/50 rounded-2xl px-4 py-3.5 text-ink focus:outline-none focus:border-primary transition-colors text-sm"
                   />
                 </div>
 

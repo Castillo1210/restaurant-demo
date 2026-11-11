@@ -2,20 +2,28 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCart } from '../CartContext';
-import { createPedido, agregarDetalle, getActivePedidoForMesa } from '../services/ordersService';
+import { getActivePedidoForMesa, COMENTARIO_MAXIMO } from '../services/ordersService';
+import useEnviarPedido from '../hooks/useEnviarPedido';
 import { getCremas } from '../services/cremasService';
-import { useAuth } from '../context/AuthContext';
-import { ChevronLeft, Trash2, Plus, Minus, FileText, Send, ShoppingBag, UtensilsCrossed } from 'lucide-react';
+import { ChevronLeft, Trash2, Plus, Minus, FileText, Send, ShoppingBag, UtensilsCrossed, StickyNote } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { etiquetaMesa } from '../utils/mesaLabel';
+import NotaPlatoDialog from '../components/NotaPlatoDialog';
 
 export default function CartPage() {
   const navigate = useNavigate();
-  const { cart, activeTable, updateQuantity, removeFromCart, total, clearCart } = useCart();
-  const { user } = useAuth();
+  const { cart, activeTable, updateQuantity, removeFromCart, setItemNote, total } = useCart();
+  // Línea del carrito cuya nota se está escribiendo ("sin cebolla").
+  const [notaDe, setNotaDe] = useState(null);
   const [cremasDisponibles, setCremasDisponibles] = useState([]);
   const [cremasSeleccionadas, setCremasSeleccionadas] = useState(new Set());
+  // Comentario general del pedido ("todo para llevar", "servir juntos"): uno por pedido, sale
+  // destacado arriba en la comanda. Si la mesa ya tiene pedido, se muestra el que tiene y se
+  // puede ajustar en este mismo envío.
   const [note, setNote] = useState('');
-  const [isSending, setIsSending] = useState(false);
+  const [comentarioOriginal, setComentarioOriginal] = useState(null);
+  // Envío compartido con el botón de un clic del monitor (anti doble toque incluido).
+  const { enviar, enviando: isSending } = useEnviarPedido();
 
   // Cremas/toppings del catálogo administrable (Fase 8): chips de un solo tap para no
   // tener que escribir todo a mano cada vez. Se pueden combinar entre sí y con una nota
@@ -23,6 +31,19 @@ export default function CartPage() {
   useEffect(() => {
     getCremas({ soloActivas: true }).then((cremas) => setCremasDisponibles(cremas.map((c) => c.nombre)));
   }, []);
+
+  useEffect(() => {
+    if (activeTable?.status !== 'occupied') return undefined;
+    let vigente = true;
+    getActivePedidoForMesa(activeTable.id)
+      .then((activo) => {
+        if (!vigente || !activo) return;
+        setComentarioOriginal(activo.comentario ?? '');
+        setNote((actual) => actual || activo.comentario || '');
+      })
+      .catch(() => { /* sin conexión: se envía sin tocar el comentario */ });
+    return () => { vigente = false; };
+  }, [activeTable?.id, activeTable?.status]);
 
   const itemCount = cart.reduce((acc, i) => acc + i.quantity, 0);
   const itemLabel = itemCount === 1 ? '1 artículo' : `${itemCount} artículos`;
@@ -36,67 +57,31 @@ export default function CartPage() {
     });
   };
 
-  // Combina las cremas elegidas por tap con lo que se haya escrito a mano en el campo libre.
+  // Comentario del pedido = cremas elegidas por tap + lo escrito a mano.
   const notaCompuesta = () => {
     const partes = [...cremasSeleccionadas];
     if (note.trim()) partes.push(note.trim());
     return partes.join(', ');
   };
-
-  const buildDetalles = () => {
-    const nota = notaCompuesta();
-    return cart.map((item, idx) => ({
-      productoId: item.id,
-      cantidad: item.quantity,
-      // El backend solo soporta notas por línea (no una nota global del pedido);
-      // como compromiso pragmático, la nota general se adjunta a la primera línea.
-      notas: idx === 0 && nota ? nota : undefined,
-    }));
-  };
+  const largoComentario = notaCompuesta().length;
 
   const handleSendOrder = async () => {
-    if (!activeTable) {
-      toast.error('No hay una mesa seleccionada');
+    const comentario = notaCompuesta();
+    if (comentario.length > COMENTARIO_MAXIMO) {
+      toast.error(`El comentario admite hasta ${COMENTARIO_MAXIMO} caracteres`);
       return;
     }
-    if (!user?.usuarioId) {
-      toast.error('No se pudo identificar al mozo. Vuelve a iniciar sesión.');
-      return;
-    }
-
-    setIsSending(true);
     try {
-      const detalles = buildDetalles();
-      let pedido;
-
-      if (activeTable.status === 'occupied') {
-        // La mesa ya tiene un pedido activo: se agregan los ítems a ese pedido
-        // en vez de crear uno nuevo (una mesa no puede tener dos pedidos abiertos).
-        const activo = await getActivePedidoForMesa(activeTable.id);
-        if (!activo) {
-          throw new Error('La mesa figura ocupada pero no se encontró su pedido activo. Actualiza la pantalla e intenta de nuevo.');
-        }
-        for (const detalle of detalles) {
-          pedido = await agregarDetalle(activo.id, detalle);
-        }
-      } else {
-        pedido = await createPedido({
-          mesaId: activeTable.id,
-          usuarioId: user.usuarioId,
-          detalles,
-        });
-      }
-
-      clearCart();
+      const enviado = await enviar({ comentario, comentarioOriginal });
+      if (!enviado) return; // ya había un envío en curso (doble toque)
+      const { pedido, comandaCaja } = enviado;
       setCremasSeleccionadas(new Set());
       setNote('');
       navigate('/success', {
-        state: { pedidoId: pedido.id, mesaNumero: pedido.mesaNumero },
+        state: { pedidoId: pedido.id, mesaNumero: pedido.mesaNumero, salonNombre: pedido.salonNombre, comandaCaja },
       });
     } catch (err) {
       toast.error(err.message ?? 'Error al enviar el pedido. Intenta de nuevo.');
-    } finally {
-      setIsSending(false);
     }
   };
 
@@ -110,7 +95,7 @@ export default function CartPage() {
         <div className="w-20 h-20 bg-card rounded-3xl flex items-center justify-center mb-5 border border-gray-800">
           <ShoppingBag size={36} className="text-gray-600" />
         </div>
-        <h2 className="text-xl font-extrabold text-white mb-2">Carrito vacío</h2>
+        <h2 className="text-xl font-extrabold text-ink mb-2">Carrito vacío</h2>
         <p className="text-gray-500 text-sm mb-8 text-center">
           Aún no has añadido productos a la mesa.
         </p>
@@ -132,14 +117,17 @@ export default function CartPage() {
         <div className="flex items-center gap-3">
           <motion.button
             whileTap={{ scale: 0.9 }}
-            onClick={() => navigate('/dashboard')}
+            // Atrás = volver a la carta de esta mesa (para agregar más platos), no al mapa de mesas.
+            onClick={() => navigate('/dashboard', { state: { abrirCarta: true } })}
             className="p-2 bg-card rounded-full hover:bg-cardHighlight border border-gray-800/50"
+            aria-label="Volver a la carta"
+            title="Volver a la carta"
           >
             <ChevronLeft size={22} />
           </motion.button>
           <div>
             <h1 className="text-lg font-extrabold tracking-tight">
-              Pedido · Mesa {activeTable?.numeroMesa}
+              Pedido · {etiquetaMesa(activeTable?.salonNombre, activeTable?.numeroMesa)}
             </h1>
             <p className="text-xs text-gray-500">{itemLabel} seleccionados</p>
           </div>
@@ -151,7 +139,7 @@ export default function CartPage() {
         <AnimatePresence>
           {cart.map((item) => (
             <motion.div
-              key={item.id}
+              key={item.linea ?? item.id}
               layout
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -163,17 +151,27 @@ export default function CartPage() {
                 <UtensilsCrossed size={20} className="text-gray-600" />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="font-bold text-sm leading-tight truncate">{item.name}</h3>
+                <h3 className="font-bold text-sm leading-tight break-words">{item.name}</h3>
                 <p className="text-primary text-xs font-bold mt-0.5">
                   S/ {item.price.toFixed(2)} / ud.
+                  {item.precioEditado && (
+                    <span className="ml-1.5 text-[10px] font-bold text-amber-400">
+                      (carta S/ {Number(item.precioCarta).toFixed(2)})
+                    </span>
+                  )}
                 </p>
+                {item.nota && (
+                  <p className="text-xs font-bold text-amber-400 mt-1 flex items-start gap-1 break-words">
+                    <StickyNote size={12} className="mt-0.5 flex-shrink-0" /> {item.nota}
+                  </p>
+                )}
                 {/* Counter */}
                 <div className="flex items-center gap-2 mt-2.5">
                   <div className="flex items-center gap-1.5 bg-background rounded-full px-1.5 py-1 border border-gray-700/40">
                     <motion.button
                       whileTap={{ scale: 0.8 }}
-                      onClick={() => updateQuantity(item.id, -1)}
-                      className="w-7 h-7 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
+                      onClick={() => updateQuantity(item.linea, -1)}
+                      className="w-7 h-7 rounded-full flex items-center justify-center text-gray-400 hover:text-ink hover:bg-gray-700 transition-colors"
                     >
                       <Minus size={13} />
                     </motion.button>
@@ -181,18 +179,30 @@ export default function CartPage() {
                       key={item.quantity}
                       initial={{ scale: 1.3 }}
                       animate={{ scale: 1 }}
-                      className="w-5 text-center text-sm font-extrabold text-white"
+                      className="w-5 text-center text-sm font-extrabold text-ink"
                     >
                       {item.quantity}
                     </motion.span>
                     <motion.button
                       whileTap={{ scale: 0.8 }}
-                      onClick={() => updateQuantity(item.id, 1)}
+                      onClick={() => updateQuantity(item.linea, 1)}
                       className="w-7 h-7 bg-primary rounded-full flex items-center justify-center hover:bg-primaryHover transition-colors"
                     >
                       <Plus size={13} className="text-white" />
                     </motion.button>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setNotaDe(item)}
+                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-bold border whitespace-nowrap transition-colors ${
+                      item.nota
+                        ? 'border-amber-700/50 text-amber-400 bg-amber-950/40'
+                        : 'border-gray-700/40 text-gray-400 hover:text-primary hover:border-primary/50'
+                    }`}
+                    aria-label={`Nota de ${item.name}`}
+                  >
+                    <StickyNote size={13} /> Nota
+                  </button>
                 </div>
               </div>
 
@@ -203,7 +213,7 @@ export default function CartPage() {
                 <motion.button
                   whileTap={{ scale: 0.85 }}
                   onClick={() => {
-                    removeFromCart(item.id);
+                    removeFromCart(item.linea);
                     toast(`${item.name} eliminado`, { icon: '🗑️', duration: 1500 });
                   }}
                   className="p-1.5 hover:bg-red-500/20 rounded-full text-gray-600 hover:text-red-500 transition-colors"
@@ -220,8 +230,11 @@ export default function CartPage() {
       <div className="px-4 pb-8 pt-3 border-t border-gray-800/60 bg-card/80 backdrop-blur-md space-y-4">
         {/* Cremas rápidas */}
         <div>
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
-            Cremas / observaciones
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+            Comentario del pedido
+          </p>
+          <p className="text-[11px] text-gray-500 mb-2">
+            Cremas y lo que cocina debe saber de todo el pedido. Sale arriba en la comanda. Para un solo plato, usa «Nota» en ese plato.
           </p>
           <div className="flex gap-2 flex-wrap">
             {cremasDisponibles.length === 0 && (
@@ -248,16 +261,28 @@ export default function CartPage() {
           </div>
         </div>
 
-        {/* Nota al cocinero (para lo que no cubren las chips de arriba) */}
-        <div className="flex items-center gap-3 bg-background p-3.5 rounded-2xl border border-gray-700/30">
-          <FileText size={17} className="text-gray-500 flex-shrink-0" />
-          <input
-            type="text"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="Otra indicación (opcional)…"
-            className="bg-transparent w-full text-sm focus:outline-none placeholder-gray-600 text-white"
-          />
+        {/* Comentario libre (para lo que no cubren las chips de arriba) */}
+        <div>
+          <div className="flex items-center gap-3 bg-background p-3.5 rounded-2xl border border-gray-700/30 focus-within:border-primary/60">
+            <FileText size={17} className="text-gray-500 flex-shrink-0" />
+            <input
+              type="text"
+              value={note}
+              maxLength={COMENTARIO_MAXIMO}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Ej.: todo para llevar, servir juntos…"
+              aria-label="Comentario del pedido"
+              className="bg-transparent w-full text-sm focus:outline-none placeholder-gray-600 text-ink"
+            />
+          </div>
+          {comentarioOriginal && (
+            <p className="text-[11px] text-gray-500 mt-1 px-1">Comentario actual del pedido; puedes cambiarlo o borrarlo.</p>
+          )}
+          {largoComentario > COMENTARIO_MAXIMO - 50 && (
+            <p className={`text-[11px] mt-1 px-1 ${largoComentario > COMENTARIO_MAXIMO ? 'text-red-400 font-bold' : 'text-gray-500'}`}>
+              {largoComentario}/{COMENTARIO_MAXIMO} caracteres
+            </p>
+          )}
         </div>
 
         {/* Total */}
@@ -267,7 +292,7 @@ export default function CartPage() {
             key={total}
             initial={{ scale: 1.05 }}
             animate={{ scale: 1 }}
-            className="text-white font-extrabold text-2xl"
+            className="text-ink font-extrabold text-2xl"
           >
             S/ {total.toFixed(2)}
           </motion.span>
@@ -290,6 +315,15 @@ export default function CartPage() {
           )}
         </motion.button>
       </div>
+      <NotaPlatoDialog
+        item={notaDe}
+        sugerencias={cremasDisponibles}
+        onCerrar={() => setNotaDe(null)}
+        onGuardar={(nota, cantidad) => {
+          setItemNote(notaDe.linea, nota, cantidad);
+          setNotaDe(null);
+        }}
+      />
     </div>
   );
 }

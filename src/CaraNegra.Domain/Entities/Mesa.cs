@@ -11,6 +11,12 @@ public class Mesa : BaseEntity
     public string NumeroMesa { get; set; } = string.Empty;
     public EstadoMesa Estado { get; set; } = EstadoMesa.Disponible;
 
-    // Propiedad de Navegacion
+    // Salón / área a la que pertenece la mesa. Es nullable solo a nivel de base de datos para
+    // que la migración no falle con mesas ya existentes (SalonSeeder las asigna a un
+    // "Salón principal" al arrancar); crear o editar una mesa SIEMPRE exige un salón.
+    public int? SalonId { get; set; }
+
+    // Propiedades de Navegacion
+    public Salon? Salon { get; set; }
     public ICollection<Pedido> Pedidos { get; set; } = new List<Pedido>();
 }
