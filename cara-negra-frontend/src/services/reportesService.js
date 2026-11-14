@@ -71,7 +71,7 @@ export const getProductosMasVendidos = async (fechaDesde, fechaHasta, top = 10) 
   }
 };
 
-const descargarArchivo = (blob, nombreArchivo) => {
+export const descargarArchivo = (blob, nombreArchivo) => {
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

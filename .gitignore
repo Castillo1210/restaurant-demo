@@ -58,6 +58,7 @@ tools/
 **/appsettings.*.json
 !**/appsettings.json
 !**/appsettings.Development.json
+!deploy/appsettings.Production.ejemplo.json
 secrets.json
 *.pfx
 *.p12

@@ -5,6 +5,7 @@
 // ============================================================
 
 import api, { getApiErrorMessage, TIMEOUT_SUNAT_MS } from './api';
+import { descargarArchivo } from './reportesService';
 
 /**
  * Emite la boleta o factura de un pedido ya pagado.
@@ -43,6 +44,24 @@ export const getComprobanteById = async (id) => {
 export const getComprobantes = async (params = {}) => {
   const { data } = await api.get('/comprobantes', { params });
   return data;
+};
+
+/**
+ * Descarga un .xlsx con los comprobantes del rango y tipo indicados (mismos filtros que la pantalla).
+ * @param {{ fechaDesde:string, fechaHasta:string, tipo?:'Boleta'|'Factura' }} params fechas "yyyy-MM-dd" (calendario de Lima)
+ */
+export const exportarComprobantes = async ({ fechaDesde, fechaHasta, tipo }) => {
+  try {
+    const { data } = await api.get('/comprobantes/exportar', {
+      params: { fechaDesde, fechaHasta, tipo: tipo || undefined },
+      responseType: 'blob',
+    });
+    const rango = fechaDesde === fechaHasta ? fechaDesde : `${fechaDesde}_a_${fechaHasta}`;
+    const sufijo = tipo === 'Boleta' ? '_boletas' : tipo === 'Factura' ? '_facturas' : '';
+    descargarArchivo(data, `comprobantes_${rango}${sufijo}.xlsx`);
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, 'No se pudo exportar los comprobantes'));
+  }
 };
 
 /**

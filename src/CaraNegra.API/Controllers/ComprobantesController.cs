@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using CaraNegra.API.Reportes;
 using CaraNegra.Application.Common.Interfaces;
 using CaraNegra.Application.Comprobantes.Commands;
 using CaraNegra.Application.Comprobantes.DTOs;
@@ -51,6 +52,38 @@ public class ComprobantesController : ControllerBase
     {
         var result = await _mediator.Send(new GetAllComprobantesQuery(fechaDesde, fechaHasta, tipo));
         return Ok(result);
+    }
+
+    /// <summary>
+    /// Exporta a Excel (.xlsx) los comprobantes del rango de fechas (calendario de Lima) y tipo
+    /// indicados: los mismos filtros y totales que la pantalla de Comprobantes.
+    /// </summary>
+    [HttpGet("exportar")]
+    public async Task<IActionResult> Exportar(
+        [FromQuery] DateTime? fechaDesde = null,
+        [FromQuery] DateTime? fechaHasta = null,
+        [FromQuery] TipoComprobante? tipo = null)
+    {
+        var hoyLima = CaraNegra.Application.Common.PeruDateRangeHelper.ToHoraPeru(DateTime.UtcNow).Date;
+        var desde = (fechaDesde ?? hoyLima).Date;
+        var hasta = (fechaHasta ?? fechaDesde ?? hoyLima).Date;
+        if (desde > hasta)
+        {
+            return BadRequest(new { mensaje = "La fecha de inicio no puede ser posterior a la fecha de fin." });
+        }
+
+        var listado = await _mediator.Send(new GetAllComprobantesQuery(desde, hasta, tipo));
+        var bytes = ReportesExcelBuilder.ConstruirComprobantes(listado, desde, hasta);
+
+        var rango = desde == hasta ? $"{desde:yyyy-MM-dd}" : $"{desde:yyyy-MM-dd}_a_{hasta:yyyy-MM-dd}";
+        var sufijoTipo = tipo switch
+        {
+            TipoComprobante.Boleta => "_boletas",
+            TipoComprobante.Factura => "_facturas",
+            _ => string.Empty
+        };
+        return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            $"comprobantes_{rango}{sufijoTipo}.xlsx");
     }
 
     [HttpGet("{id}")]

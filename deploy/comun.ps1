@@ -307,14 +307,15 @@ function Configurar-ImpresoraCocina($Cfg) {
 
 # Tamaño de letra de los platos en la comanda de cocina (el número de mesa siempre va grande).
 function Elegir-TamanoComanda($Imp) {
-    $nombres = @{ 'Grande' = 'grande'; 'Alto' = 'mediana'; 'Normal' = 'pequeña' }
+    $nombres = @{ 'Grande' = 'grande'; 'Intermedia' = 'intermedia'; 'Alto' = 'mediana'; 'Normal' = 'pequeña' }
     $actual = if ($Imp.PSObject.Properties['TamanoProductos'] -and $nombres.ContainsKey([string]$Imp.TamanoProductos)) { [string]$Imp.TamanoProductos } else { 'Alto' }
     Write-Host '    Letra de los platos en la comanda:'
-    Write-Host '      1 = Grande  (doble alto y doble ancho)'
-    Write-Host '      2 = Mediana (doble alto; entra más texto por línea) - recomendada'
-    Write-Host '      3 = Pequeña (letra normal en negrita)'
-    $r = (Read-Host "    Elige 1, 2 o 3 [Enter = $($nombres[$actual])]").Trim()
-    $tamano = switch ($r) { '1' { 'Grande' } '2' { 'Alto' } '3' { 'Normal' } default { $actual } }
+    Write-Host '      1 = Grande     (doble alto y doble ancho; 21 letras por línea)'
+    Write-Host '      2 = Intermedia (entre grande y mediana; 28 letras por línea)'
+    Write-Host '      3 = Mediana    (doble alto; 42 letras por línea) - recomendada'
+    Write-Host '      4 = Pequeña    (letra normal en negrita)'
+    $r = (Read-Host "    Elige 1, 2, 3 o 4 [Enter = $($nombres[$actual])]").Trim()
+    $tamano = switch ($r) { '1' { 'Grande' } '2' { 'Intermedia' } '3' { 'Alto' } '4' { 'Normal' } default { $actual } }
     if ($Imp.PSObject.Properties['TamanoProductos']) { $Imp.TamanoProductos = $tamano }
     else { $Imp | Add-Member -NotePropertyName 'TamanoProductos' -NotePropertyValue $tamano }
     Escribir-Ok "Letra de los platos: $($nombres[$tamano])"

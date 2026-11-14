@@ -19,8 +19,9 @@ public class ImpresoraCocinaOptions
     public int Columnas { get; set; } = 42;
 
     /// <summary>
-    /// Tamaño de los productos en la comanda: "Grande" (doble alto y ancho), "Alto" (doble
-    /// alto, entra más texto por línea; por defecto) o "Normal" (negrita en letra normal).
+    /// Tamaño de los productos en la comanda, de mayor a menor: "Grande" (doble alto y ancho,
+    /// 21 letras por línea), "Intermedia" (fuente compacta a doble alto y ancho, 28 letras),
+    /// "Alto" (doble alto, 42 letras; por defecto) o "Normal" (negrita en letra normal).
     /// </summary>
     public string TamanoProductos { get; set; } = "Alto";
 }

@@ -1,5 +1,10 @@
+using CaraNegra.Application.Common;
+using CaraNegra.Application.Comprobantes;
+using CaraNegra.Application.Comprobantes.Queries;
+using CaraNegra.Application.Jornadas;
 using CaraNegra.Application.Pedidos.DTOs;
 using CaraNegra.Application.Reportes.DTOs;
+using CaraNegra.Domain.Enums;
 using ClosedXML.Excel;
 
 namespace CaraNegra.API.Reportes;
@@ -134,6 +139,208 @@ public static class ReportesExcelBuilder
         libro.SaveAs(stream);
         return stream.ToArray();
     }
+
+    /// <summary>
+    /// Comprobantes electrónicos (boletas y facturas) del rango indicado, uno por fila, con su
+    /// estado frente a SUNAT. Igual que en la pantalla de Comprobantes, los totales solo suman
+    /// los válidos: los rechazados, con error de envío o anulados salen en gris y no cuentan.
+    /// </summary>
+    public static byte[] ConstruirComprobantes(ComprobantesListadoDto listado, DateTime fechaDesde, DateTime fechaHasta)
+    {
+        using var libro = new XLWorkbook();
+        var hoja = libro.Worksheets.Add("Comprobantes");
+
+        hoja.Cell(1, 1).Value = "Comprobantes electrónicos";
+        hoja.Cell(1, 1).Style.Font.Bold = true;
+        hoja.Cell(1, 1).Style.Font.FontSize = 14;
+        hoja.Cell(2, 1).Value = fechaDesde.Date == fechaHasta.Date
+            ? $"Fecha: {fechaDesde:dd/MM/yyyy}"
+            : $"Del {fechaDesde:dd/MM/yyyy} al {fechaHasta:dd/MM/yyyy}";
+
+        const int filaEncabezado = 4;
+        var encabezados = new[]
+        {
+            "Fecha", "Hora", "Tipo", "Número", "Documento cliente", "Cliente",
+            "Op. gravada (S/)", "IGV (S/)", "Total (S/)", "Estado SUNAT", "Mensaje SUNAT"
+        };
+        for (var c = 0; c < encabezados.Length; c++)
+        {
+            hoja.Cell(filaEncabezado, c + 1).Value = encabezados[c];
+        }
+        hoja.Row(filaEncabezado).Style.Font.Bold = true;
+
+        var fila = filaEncabezado + 1;
+        foreach (var c in listado.Items.OrderBy(x => x.FechaEmision))
+        {
+            // FechaEmision se guarda en UTC: se muestra en hora de Lima, como en pantalla.
+            var horaLima = PeruDateRangeHelper.ToHoraPeru(c.FechaEmision);
+            hoja.Cell(fila, 1).Value = horaLima.Date;
+            hoja.Cell(fila, 1).Style.DateFormat.Format = "dd/MM/yyyy";
+            hoja.Cell(fila, 2).Value = horaLima.ToString("HH:mm");
+            hoja.Cell(fila, 3).Value = c.TipoComprobante == TipoComprobante.Factura ? "Factura" : "Boleta";
+            hoja.Cell(fila, 4).Value = c.Numero;
+            hoja.Cell(fila, 5).Value = c.ClienteNumeroDocumento ?? string.Empty;
+            hoja.Cell(fila, 6).Value = c.ClienteNombre;
+            hoja.Cell(fila, 7).Value = c.OpGravada;
+            hoja.Cell(fila, 8).Value = c.Igv;
+            hoja.Cell(fila, 9).Value = c.Total;
+            hoja.Range(fila, 7, fila, 9).Style.NumberFormat.Format = "#,##0.00";
+            hoja.Cell(fila, 10).Value = TextoEstado(c.Estado);
+            hoja.Cell(fila, 11).Value = c.MensajeSunat ?? string.Empty;
+
+            if (ComprobanteEnvio.NoEsValido(c.Estado))
+            {
+                hoja.Range(fila, 1, fila, encabezados.Length).Style.Font.FontColor = XLColor.Gray;
+            }
+            fila++;
+        }
+        var ultimaFilaDatos = fila - 1;
+
+        // Totales (solo comprobantes válidos, los mismos que muestra la pantalla).
+        fila++;
+        hoja.Cell(fila, 6).Value = "Total (solo válidos)";
+        hoja.Cell(fila, 7).Value = listado.TotalOpGravada;
+        hoja.Cell(fila, 8).Value = listado.TotalIgv;
+        hoja.Cell(fila, 9).Value = listado.TotalVendido;
+        hoja.Range(fila, 7, fila, 9).Style.NumberFormat.Format = "#,##0.00";
+        hoja.Range(fila, 6, fila, 9).Style.Font.Bold = true;
+        fila++;
+        hoja.Cell(fila, 6).Value = "Boletas";
+        hoja.Cell(fila, 7).Value = listado.CantidadBoletas;
+        fila++;
+        hoja.Cell(fila, 6).Value = "Facturas";
+        hoja.Cell(fila, 7).Value = listado.CantidadFacturas;
+
+        if (ultimaFilaDatos > filaEncabezado)
+        {
+            hoja.Range(filaEncabezado, 1, ultimaFilaDatos, encabezados.Length).SetAutoFilter();
+        }
+        hoja.SheetView.FreezeRows(filaEncabezado);
+
+        // Se ajusta desde la fila de encabezados para que el título no ensanche la primera columna.
+        hoja.Columns().AdjustToContents(filaEncabezado, fila);
+        if (hoja.Column(11).Width > 60) hoja.Column(11).Width = 60;
+
+        using var stream = new MemoryStream();
+        libro.SaveAs(stream);
+        return stream.ToArray();
+    }
+
+    /// <summary>
+    /// Historial de pedidos del rango (Pedidos del día): todos los pedidos, cobrados, abiertos y
+    /// anulados, con sus medios de pago y comprobante. Igual que en pantalla, lo cobrado no suma
+    /// los pedidos anulados, que salen en gris.
+    /// </summary>
+    public static byte[] ConstruirHistorialPedidos(PedidosJornadaDto datos, DateTime fechaDesde, DateTime fechaHasta)
+    {
+        using var libro = new XLWorkbook();
+        var hoja = libro.Worksheets.Add("Pedidos");
+
+        hoja.Cell(1, 1).Value = "Historial de pedidos";
+        hoja.Cell(1, 1).Style.Font.Bold = true;
+        hoja.Cell(1, 1).Style.Font.FontSize = 14;
+        hoja.Cell(2, 1).Value = fechaDesde.Date == fechaHasta.Date
+            ? $"Jornada del {fechaDesde:dd/MM/yyyy}"
+            : $"Jornadas del {fechaDesde:dd/MM/yyyy} al {fechaHasta:dd/MM/yyyy}";
+
+        const int filaEncabezado = 4;
+        var encabezados = new[]
+        {
+            "Día (jornada)", "Hora", "Pedido #", "Salón", "Mesa", "Mozo", "Platos", "Estado",
+            "Total (S/)", "Cobrado (S/)", "Medios de pago", "Comprobante", "Comentario"
+        };
+        for (var c = 0; c < encabezados.Length; c++)
+        {
+            hoja.Cell(filaEncabezado, c + 1).Value = encabezados[c];
+        }
+        hoja.Row(filaEncabezado).Style.Font.Bold = true;
+
+        var fila = filaEncabezado + 1;
+        foreach (var p in datos.Pedidos.OrderBy(x => x.CreadoEn))
+        {
+            var horaLima = PeruDateRangeHelper.ToHoraPeru(p.CreadoEn);
+            hoja.Cell(fila, 1).Value = (p.FechaOperativa ?? horaLima).Date;
+            hoja.Cell(fila, 1).Style.DateFormat.Format = "dd/MM/yyyy";
+            hoja.Cell(fila, 2).Value = horaLima.ToString("HH:mm");
+            hoja.Cell(fila, 3).Value = p.PedidoId;
+            hoja.Cell(fila, 4).Value = p.SalonNombre;
+            hoja.Cell(fila, 5).Value = p.MesaNumero;
+            hoja.Cell(fila, 6).Value = p.Mozo;
+            hoja.Cell(fila, 7).Value = p.CantidadPlatos;
+            hoja.Cell(fila, 8).Value = TextoEstadoPedido(p.Estado);
+            hoja.Cell(fila, 9).Value = p.Total;
+            hoja.Cell(fila, 10).Value = p.Estado == EstadoPedido.Cancelado ? 0m : p.Pagado;
+            hoja.Range(fila, 9, fila, 10).Style.NumberFormat.Format = "#,##0.00";
+            hoja.Cell(fila, 11).Value = string.Join(" + ", p.MetodosPago);
+            hoja.Cell(fila, 12).Value = p.Comprobante?.Numero ?? string.Empty;
+            hoja.Cell(fila, 13).Value = p.Comentario ?? string.Empty;
+
+            if (p.Estado == EstadoPedido.Cancelado)
+            {
+                hoja.Range(fila, 1, fila, encabezados.Length).Style.Font.FontColor = XLColor.Gray;
+            }
+            fila++;
+        }
+        var ultimaFilaDatos = fila - 1;
+
+        // Totales, con las mismas reglas que la pantalla.
+        var cobrados = datos.Pedidos.Count(p => p.Estado == EstadoPedido.Entregado);
+        var anulados = datos.Pedidos.Count(p => p.Estado == EstadoPedido.Cancelado);
+        var abiertos = datos.Pedidos.Count - cobrados - anulados;
+        var totalCobrado = datos.Pedidos.Where(p => p.Estado != EstadoPedido.Cancelado).Sum(p => p.Pagado);
+
+        fila++;
+        hoja.Cell(fila, 8).Value = "Total cobrado";
+        hoja.Cell(fila, 10).Value = totalCobrado;
+        hoja.Cell(fila, 10).Style.NumberFormat.Format = "#,##0.00";
+        hoja.Range(fila, 8, fila, 10).Style.Font.Bold = true;
+        fila++;
+        hoja.Cell(fila, 8).Value = "Pedidos";
+        hoja.Cell(fila, 10).Value = datos.Pedidos.Count;
+        fila++;
+        hoja.Cell(fila, 8).Value = "Cobrados";
+        hoja.Cell(fila, 10).Value = cobrados;
+        fila++;
+        hoja.Cell(fila, 8).Value = "Abiertos";
+        hoja.Cell(fila, 10).Value = abiertos;
+        fila++;
+        hoja.Cell(fila, 8).Value = "Anulados";
+        hoja.Cell(fila, 10).Value = anulados;
+
+        if (ultimaFilaDatos > filaEncabezado)
+        {
+            hoja.Range(filaEncabezado, 1, ultimaFilaDatos, encabezados.Length).SetAutoFilter();
+        }
+        hoja.SheetView.FreezeRows(filaEncabezado);
+
+        hoja.Columns().AdjustToContents(filaEncabezado, fila);
+        if (hoja.Column(13).Width > 60) hoja.Column(13).Width = 60;
+
+        using var stream = new MemoryStream();
+        libro.SaveAs(stream);
+        return stream.ToArray();
+    }
+
+    /// <summary>Mismos grupos que la pantalla Pedidos del día.</summary>
+    private static string TextoEstadoPedido(EstadoPedido estado) => estado switch
+    {
+        EstadoPedido.Entregado => "Cobrado",
+        EstadoPedido.Cancelado => "Anulado",
+        _ => "Abierto"
+    };
+
+    /// <summary>Mismos textos que la pantalla de Comprobantes (utils/estadoComprobante.js).</summary>
+    private static string TextoEstado(EstadoComprobante estado) => estado switch
+    {
+        EstadoComprobante.AceptadoSimulado => "Simulado (demo)",
+        EstadoComprobante.Aceptado => "Aceptado por SUNAT",
+        EstadoComprobante.Pendiente => "Esperando a SUNAT",
+        EstadoComprobante.PorEnviar => "Sin enviar",
+        EstadoComprobante.Rechazado => "Rechazado por SUNAT",
+        EstadoComprobante.ErrorEnvio => "No aceptado por el proveedor",
+        EstadoComprobante.Anulado => "Anulado",
+        _ => estado.ToString()
+    };
 
     // Excel no permite \ / ? * [ ] en el nombre de una hoja, ni más de 31 caracteres. El
     // número/código de mesa lo escribe el usuario libremente (Fase 7: ahora es texto, no un

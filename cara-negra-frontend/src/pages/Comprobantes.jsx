@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, FileText, Building2, User, RefreshCw, AlertTriangle, Clock, CheckCircle2, XCircle, MinusCircle } from 'lucide-react';
+import { ChevronLeft, FileText, Building2, User, RefreshCw, AlertTriangle, Clock, CheckCircle2, XCircle, MinusCircle, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { getComprobantes, getComprobanteById } from '../services/comprobantesService';
+import { getComprobantes, getComprobanteById, exportarComprobantes } from '../services/comprobantesService';
 import ComprobanteElectronico from '../components/ComprobanteElectronico';
 import EmitirComprobanteModal from '../components/EmitirComprobanteModal';
 import { parseFechaUtc } from '../utils/documentos';
@@ -11,6 +11,15 @@ import { infoEstado, TONO_BADGE } from '../utils/estadoComprobante';
 
 // Fecha de hoy en Lima como "yyyy-MM-dd" (para el <input type="date">).
 const hoyLima = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
+// Primer día del mes actual en Lima ("yyyy-MM-01").
+const inicioMesLima = () => `${hoyLima().slice(0, 8)}01`;
+
+const CLASE_FECHA =
+  'bg-card border border-gray-700/50 rounded-xl px-3 py-2 text-sm text-ink focus:outline-none focus:border-primary [color-scheme:dark]';
+const claseAtajo = (activo) =>
+  `px-3 py-2 rounded-xl text-xs font-bold border transition-colors ${
+    activo ? 'bg-primary/20 border-primary text-primary' : 'bg-card border-gray-800 text-gray-400 hover:border-gray-600'
+  }`;
 
 const FILTROS = [
   { value: '', label: 'Todos' },
@@ -51,21 +60,23 @@ function EstadoBadge({ estado, mensaje }) {
  */
 export default function Comprobantes() {
   const navigate = useNavigate();
-  const [fecha, setFecha] = useState(hoyLima());
+  const [desde, setDesde] = useState(hoyLima());
+  const [hasta, setHasta] = useState(hoyLima());
   const [tipo, setTipo] = useState('');
   const [data, setData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [seleccionado, setSeleccionado] = useState(null);
   const [reemision, setReemision] = useState(null);
   const [filtroEstado, setFiltroEstado] = useState('todos');
+  const [exportando, setExportando] = useState(false);
 
   const cargar = useCallback(() => {
     setIsLoading(true);
-    getComprobantes({ fechaDesde: fecha, fechaHasta: fecha, tipo: tipo || undefined })
+    getComprobantes({ fechaDesde: desde, fechaHasta: hasta, tipo: tipo || undefined })
       .then(setData)
       .catch(() => toast.error('No se pudieron cargar los comprobantes'))
       .finally(() => setIsLoading(false));
-  }, [fecha, tipo]);
+  }, [desde, hasta, tipo]);
 
   useEffect(() => {
     cargar();
@@ -78,6 +89,32 @@ export default function Comprobantes() {
       toast.error('No se pudo abrir el comprobante');
     }
   };
+
+  const exportarExcel = async () => {
+    setExportando(true);
+    try {
+      await exportarComprobantes({ fechaDesde: desde, fechaHasta: hasta, tipo });
+    } catch (err) {
+      toast.error(err.message ?? 'No se pudo exportar los comprobantes');
+    } finally {
+      setExportando(false);
+    }
+  };
+
+  // Si "Desde" pasa a ser posterior a "Hasta" (o al revés), se mueve la otra fecha para que el rango siga siendo válido.
+  const cambiarDesde = (valor) => {
+    if (!valor) return;
+    setDesde(valor);
+    if (valor > hasta) setHasta(valor);
+  };
+  const cambiarHasta = (valor) => {
+    if (!valor) return;
+    setHasta(valor);
+    if (valor < desde) setDesde(valor);
+  };
+  const esHoy = desde === hoyLima() && hasta === hoyLima();
+  const esEsteMes = desde === inicioMesLima() && hasta === hoyLima();
+  const variosDias = desde !== hasta;
 
   const filtroActual = FILTROS_ESTADO.find((f) => f.value === filtroEstado) ?? FILTROS_ESTADO[0];
   const visibles = (data?.items ?? []).filter((c) => filtroActual.incluye(c.estado));
@@ -109,12 +146,21 @@ export default function Comprobantes() {
       </div>
 
       <div className="px-5 flex flex-wrap gap-2 items-center">
-        <input
-          type="date"
-          value={fecha}
-          onChange={(e) => setFecha(e.target.value)}
-          className="bg-card border border-gray-700/50 rounded-xl px-3 py-2 text-sm text-ink focus:outline-none focus:border-primary [color-scheme:dark]"
-        />
+        <label className="flex items-center gap-1.5 text-xs text-gray-500">
+          Desde
+          <input type="date" value={desde} max={hoyLima()} onChange={(e) => cambiarDesde(e.target.value)} className={CLASE_FECHA} />
+        </label>
+        <label className="flex items-center gap-1.5 text-xs text-gray-500">
+          Hasta
+          <input type="date" value={hasta} max={hoyLima()} onChange={(e) => cambiarHasta(e.target.value)} className={CLASE_FECHA} />
+        </label>
+        <button onClick={() => { setDesde(hoyLima()); setHasta(hoyLima()); }} className={claseAtajo(esHoy)}>
+          Hoy
+        </button>
+        <button onClick={() => { setDesde(inicioMesLima()); setHasta(hoyLima()); }} className={claseAtajo(esEsteMes)}>
+          Este mes
+        </button>
+        <span className="w-px h-6 bg-gray-800 mx-1 hidden sm:block" />
         {FILTROS.map((f) => (
           <button
             key={f.value}
@@ -126,6 +172,15 @@ export default function Comprobantes() {
             {f.label}
           </button>
         ))}
+        <button
+          onClick={exportarExcel}
+          disabled={exportando || isLoading || (data?.items?.length ?? 0) === 0}
+          title="Descargar en Excel los comprobantes de las fechas elegidas"
+          className="ml-auto flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border bg-card border-gray-800 text-gray-300 hover:border-primary/60 hover:text-primary transition-colors disabled:opacity-40 disabled:pointer-events-none"
+        >
+          <Download size={14} />
+          {exportando ? 'Exportando…' : 'Exportar a Excel'}
+        </button>
       </div>
 
       <div className="px-5 mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -196,7 +251,7 @@ export default function Comprobantes() {
         {!isLoading && (data?.items?.length ?? 0) === 0 && (
           <div className="flex flex-col items-center text-center mt-10">
             <FileText size={32} className="text-gray-700 mb-2" />
-            <p className="text-sm text-gray-500">No hay comprobantes emitidos en esta fecha.</p>
+            <p className="text-sm text-gray-500">No hay comprobantes emitidos en {variosDias ? 'estas fechas' : 'esta fecha'}.</p>
           </div>
         )}
         {!isLoading && (data?.items?.length ?? 0) > 0 && visibles.length === 0 && (
@@ -206,8 +261,8 @@ export default function Comprobantes() {
         {visibles.length > 0 && (
           <div className="bg-card border border-gray-800/50 rounded-2xl overflow-hidden">
             {/* Encabezado de columnas (pantallas medianas y grandes) */}
-            <div className="hidden md:grid grid-cols-[5.5rem_10rem_minmax(0,1fr)_5rem_6.5rem_13rem] gap-3 px-4 py-2.5 border-b border-gray-800/60 text-[11px] font-bold uppercase tracking-wider text-gray-500">
-              <span>Hora</span>
+            <div className="hidden md:grid grid-cols-[7rem_10rem_minmax(0,1fr)_5rem_6.5rem_13rem] gap-3 px-4 py-2.5 border-b border-gray-800/60 text-[11px] font-bold uppercase tracking-wider text-gray-500">
+              <span>{variosDias ? 'Fecha' : 'Hora'}</span>
               <span>Comprobante</span>
               <span>Cliente</span>
               <span className="text-right">IGV</span>
@@ -218,8 +273,10 @@ export default function Comprobantes() {
               const esFactura = c.tipoComprobante === 'Factura';
               const Icon = esFactura ? Building2 : User;
               const estado = infoEstado(c.estado);
-              const hora = parseFechaUtc(c.fechaEmision)?.toLocaleTimeString('es-PE', {
+              // Con un rango de varios días se muestra también el día ("12/11 14:30").
+              const hora = parseFechaUtc(c.fechaEmision)?.toLocaleString('es-PE', {
                 timeZone: 'America/Lima',
+                ...(variosDias ? { day: '2-digit', month: '2-digit' } : {}),
                 hour: '2-digit',
                 minute: '2-digit',
               });
@@ -246,7 +303,7 @@ export default function Comprobantes() {
                   </div>
 
                   {/* Monitor: fila de tabla */}
-                  <div className="hidden md:grid grid-cols-[5.5rem_10rem_minmax(0,1fr)_5rem_6.5rem_13rem] gap-3 items-center px-4 py-2.5 text-sm">
+                  <div className="hidden md:grid grid-cols-[7rem_10rem_minmax(0,1fr)_5rem_6.5rem_13rem] gap-3 items-center px-4 py-2.5 text-sm">
                     <span className="text-gray-400 tabular-nums whitespace-nowrap">{hora}</span>
                     <span className="flex items-center gap-2 font-mono font-extrabold text-ink">
                       <Icon size={14} className={esFactura ? 'text-sky-400' : 'text-accentGreen'} />

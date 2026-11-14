@@ -135,10 +135,9 @@ public class ImpresoraCocinaService : IImpresoraCocinaService
     public string PrevisualizarComanda(ComandaCocina comanda)
     {
         var sb = new StringBuilder();
-        var columnas = Columnas;
         foreach (var linea in ArmarComanda(comanda))
         {
-            var ancho = linea.Tam == Tamano.Grande ? columnas / 2 : columnas;
+            var ancho = AnchoDe(linea.Tam);
             var texto = NormalizarAscii(linea.Texto);
             sb.Append(linea.Centrada ? texto.PadLeft((ancho + texto.Length) / 2) : texto).Append('\n');
             if (linea.EspacioDespues) sb.Append('\n');
@@ -148,7 +147,15 @@ public class ImpresoraCocinaService : IImpresoraCocinaService
 
     // ───────────── Armado de la comanda ─────────────
 
-    private enum Tamano { Normal, Alto, Grande }
+    /// <summary>
+    /// Tamaños de letra de la ticketera (fuente A = la normal, 12 puntos de ancho; fuente B = la
+    /// compacta, 9 puntos):
+    ///   Normal     fuente A 1x1 → 42 caracteres por línea (80 mm)
+    ///   Alto       fuente A 1x2 (doble alto) → 42
+    ///   Intermedio fuente B 2x2 (doble alto y ancho) → 28: entre Alto y Grande
+    ///   Grande     fuente A 2x2 (doble alto y ancho) → 21
+    /// </summary>
+    private enum Tamano { Normal, Alto, Intermedio, Grande }
 
     /// <summary>Una línea del ticket ya cortada al ancho que le corresponde según su tamaño.</summary>
     private sealed record Linea(string Texto, Tamano Tam = Tamano.Normal, bool Negrita = false,
@@ -160,8 +167,17 @@ public class ImpresoraCocinaService : IImpresoraCocinaService
     private Tamano TamanoProductos => (_options.TamanoProductos ?? string.Empty).Trim().ToLowerInvariant() switch
     {
         "grande" => Tamano.Grande,
+        "intermedia" or "intermedio" => Tamano.Intermedio,
         "normal" => Tamano.Normal,
         _ => Tamano.Alto
+    };
+
+    /// <summary>Caracteres que entran en una línea con ese tamaño de letra (ver <see cref="Tamano"/>).</summary>
+    private int AnchoDe(Tamano tamano) => tamano switch
+    {
+        Tamano.Grande => Columnas / 2,
+        Tamano.Intermedio => Columnas * 2 / 3,
+        _ => Columnas
     };
 
     private List<Linea> ArmarComanda(ComandaCocina comanda)
@@ -189,8 +205,8 @@ public class ImpresoraCocinaService : IImpresoraCocinaService
         var etiquetaMesa = palabrasSalon.Length > 0
             ? $"{palabrasSalon[0].ToUpperInvariant()} {comanda.MesaNumero}"
             : $"MESA {comanda.MesaNumero}";
-        foreach (var parte in Envolver(etiquetaMesa, columnas / 2, string.Empty))
-            lineas.Add(new Linea(parte, Tamano.Grande, Negrita: true, Centrada: true));
+        foreach (var parte in Envolver(etiquetaMesa, columnas, string.Empty))
+            lineas.Add(new Linea(parte, Tamano.Alto, Negrita: true, Centrada: true));
         if (palabrasSalon.Length > 1)
             lineas.Add(new Linea($"({salon})", Centrada: true));
 
@@ -201,11 +217,11 @@ public class ImpresoraCocinaService : IImpresoraCocinaService
         var rotuloPersona = comanda.EsAnulacion ? "Anulo" : comanda.EsCambioComentario ? "Por" : "Mozo";
         var persona = $"{rotuloPersona}: {comanda.MozoNombre}";
         if (persona.Length + 1 + textoHora.Length <= columnas)
-            lineas.Add(new Linea(Columnas2(persona, textoHora, columnas)));
+            lineas.Add(new Linea(Columnas2(persona, textoHora, columnas), Tamano.Alto));
         else
         {
             foreach (var parte in Envolver(persona, columnas, new string(' ', rotuloPersona.Length + 2)))
-                lineas.Add(new Linea(parte));
+                lineas.Add(new Linea(parte, Tamano.Alto));
             lineas.Add(new Linea(textoHora));
         }
         if (comanda.EsAnulacion && !string.IsNullOrWhiteSpace(comanda.Motivo))
@@ -233,7 +249,7 @@ public class ImpresoraCocinaService : IImpresoraCocinaService
         // Productos seguidos, sin líneas en blanco entre ellos (ahorra papel). En una anulación la
         // cocina solo tiene que reconocer los platos → siempre letra normal.
         var tam = comanda.EsAnulacion ? Tamano.Normal : TamanoProductos;
-        var ancho = tam == Tamano.Grande ? columnas / 2 : columnas;
+        var ancho = AnchoDe(tam);
         foreach (var item in comanda.Items)
         {
             var prefijo = $"{item.Cantidad} x ";
@@ -265,9 +281,10 @@ public class ImpresoraCocinaService : IImpresoraCocinaService
         {
             b.AddRange(new byte[] { 0x1B, 0x61, (byte)(linea.Centrada ? 1 : 0) });   // ESC a: alineación
             b.AddRange(new byte[] { 0x1B, 0x45, (byte)(linea.Negrita ? 1 : 0) });    // ESC E: negrita
+            b.AddRange(new byte[] { 0x1B, 0x4D, (byte)(linea.Tam == Tamano.Intermedio ? 1 : 0) }); // ESC M: fuente A / B
             b.AddRange(new byte[] { 0x1D, 0x21, linea.Tam switch                       // GS !: tamaño
             {
-                Tamano.Grande => (byte)0x11,   // doble ancho + doble alto
+                Tamano.Grande or Tamano.Intermedio => (byte)0x11,   // doble ancho + doble alto
                 Tamano.Alto => (byte)0x01,     // doble alto
                 _ => (byte)0x00
             } });
@@ -279,7 +296,7 @@ public class ImpresoraCocinaService : IImpresoraCocinaService
                 b.Add(0x0A);
             }
         }
-        b.AddRange(new byte[] { 0x1D, 0x21, 0x00, 0x1B, 0x45, 0x00, 0x1B, 0x61, 0x00 }); // volver a normal
+        b.AddRange(new byte[] { 0x1D, 0x21, 0x00, 0x1B, 0x45, 0x00, 0x1B, 0x61, 0x00, 0x1B, 0x4D, 0x00 }); // volver a normal
         b.AddRange(new byte[] { 0x1B, 0x64, 0x04 });          // ESC d 4: avanzar 4 líneas
         b.AddRange(new byte[] { 0x1D, 0x56, 0x42, 0x00 });    // GS V B 0: cortar (si tiene cortador)
         return b.ToArray();

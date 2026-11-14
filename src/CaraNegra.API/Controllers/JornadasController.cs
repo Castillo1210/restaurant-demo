@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using CaraNegra.API.Reportes;
+using CaraNegra.Application.Common;
 using CaraNegra.Application.Jornadas;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -61,12 +63,41 @@ public class JornadasController : ControllerBase
 
     /// <summary>
     /// "Pedidos del día": todos los pedidos de la jornada abierta (o la última). El ADMIN puede
-    /// pedir otra jornada con ?jornadaId=.
+    /// pedir otra jornada con ?jornadaId= o el historial de un rango con ?fechaDesde=&amp;fechaHasta=
+    /// (fechas operativas de las jornadas, p. ej. un mes entero).
     /// </summary>
     [HttpGet("pedidos")]
     [Authorize(Roles = "ADMIN,CAJERO")]
-    public Task<IActionResult> Pedidos([FromQuery] int? jornadaId) =>
-        Ejecutar(() => _mediator.Send(new GetPedidosJornadaQuery(jornadaId, User.IsInRole("ADMIN"))));
+    public Task<IActionResult> Pedidos([FromQuery] int? jornadaId, [FromQuery] DateTime? fechaDesde = null,
+        [FromQuery] DateTime? fechaHasta = null)
+    {
+        if (fechaDesde is null && fechaHasta is null)
+            return Ejecutar(() => _mediator.Send(new GetPedidosJornadaQuery(jornadaId, User.IsInRole("ADMIN"))));
+
+        var (desde, hasta) = Rango(fechaDesde, fechaHasta);
+        return Ejecutar(() => _mediator.Send(new GetPedidosRangoQuery(desde, hasta, User.IsInRole("ADMIN"))));
+    }
+
+    /// <summary>Exporta a Excel (.xlsx) el historial de pedidos del rango indicado (ADMIN).</summary>
+    [HttpGet("pedidos/exportar")]
+    [Authorize(Roles = "ADMIN")]
+    public async Task<IActionResult> ExportarPedidos([FromQuery] DateTime? fechaDesde = null, [FromQuery] DateTime? fechaHasta = null)
+    {
+        var (desde, hasta) = Rango(fechaDesde, fechaHasta);
+        var datos = await _mediator.Send(new GetPedidosRangoQuery(desde, hasta, true));
+        var bytes = ReportesExcelBuilder.ConstruirHistorialPedidos(datos, desde, hasta);
+        var nombre = desde == hasta ? $"pedidos_{desde:yyyy-MM-dd}.xlsx" : $"pedidos_{desde:yyyy-MM-dd}_a_{hasta:yyyy-MM-dd}.xlsx";
+        return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", nombre);
+    }
+
+    /// <summary>Completa un rango de fechas: lo que falte se toma de la otra fecha o de hoy (Lima).</summary>
+    private static (DateTime Desde, DateTime Hasta) Rango(DateTime? fechaDesde, DateTime? fechaHasta)
+    {
+        var hoy = PeruDateRangeHelper.ToHoraPeru(DateTime.UtcNow).Date;
+        var desde = (fechaDesde ?? fechaHasta ?? hoy).Date;
+        var hasta = (fechaHasta ?? fechaDesde ?? hoy).Date;
+        return (desde, hasta);
+    }
 
     /// <summary>Historial de jornadas (ADMIN).</summary>
     [HttpGet]

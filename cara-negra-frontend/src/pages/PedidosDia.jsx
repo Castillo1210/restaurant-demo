@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Search, X, RefreshCw, ReceiptText, FileText, MessageSquareText, Ban, Receipt, ListOrdered } from 'lucide-react';
+import { ChevronLeft, Search, X, RefreshCw, ReceiptText, FileText, MessageSquareText, Ban, Receipt, ListOrdered, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { getPedidosJornada, getHistorialJornadas } from '../services/jornadaService';
+import { getPedidosJornada, getPedidosRango, exportarPedidosRango } from '../services/jornadaService';
 import { getPedidoById } from '../services/ordersService';
 import { getComprobanteDePedido } from '../services/comprobantesService';
 import { connectPedidosHub, onHubEvent, onHubReconnected } from '../services/signalrService';
@@ -12,7 +12,7 @@ import { useEmpresa } from '../context/EmpresaContext';
 import { imprimirPrecuenta } from '../utils/precuenta';
 import { agruparDetallesPorProducto } from '../utils/agruparDetalles';
 import { etiquetaMesa } from '../utils/mesaLabel';
-import { soles, horaLima, fechaOperativaTexto } from '../utils/formato';
+import { soles, horaLima, fechaOperativaTexto, hoyLimaISO } from '../utils/formato';
 import ListaAnulaciones from '../components/ListaAnulaciones';
 import ListaCambiosPrecio from '../components/ListaCambiosPrecio';
 import ComprobanteElectronico from '../components/ComprobanteElectronico';
@@ -35,6 +35,18 @@ const FILTROS = [
   { id: 'anulados', texto: 'Anulados' },
 ];
 
+// Primer día del mes actual en Lima ("yyyy-MM-01").
+const inicioMesLima = () => `${hoyLimaISO().slice(0, 8)}01`;
+// "12/11" a partir de una fecha operativa "2026-11-12T00:00:00".
+const diaMes = (valor) => (valor ? `${String(valor).slice(8, 10)}/${String(valor).slice(5, 7)}` : '');
+
+const CLASE_FECHA =
+  'bg-card border border-gray-800/50 rounded-xl px-3 py-1.5 text-sm text-ink focus:outline-none focus:border-primary [color-scheme:dark]';
+const claseAtajo = (activo) =>
+  `px-3.5 py-1.5 rounded-full text-sm font-bold border transition-colors ${
+    activo ? 'bg-primary text-white border-primary' : 'bg-card text-gray-400 border-gray-800 hover:text-ink'
+  }`;
+
 const sinTildes = (t) => String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 /**
@@ -48,8 +60,9 @@ export default function PedidosDia() {
   const empresa = useEmpresa();
   const esAdmin = user?.rol === 'ADMIN';
 
-  const [jornadaId, setJornadaId] = useState(null); // null = la actual
-  const [historial, setHistorial] = useState([]);
+  // null = la jornada actual (se actualiza en vivo); { desde, hasta } = historial de esas fechas (solo ADMIN).
+  const [rango, setRango] = useState(null);
+  const [exportando, setExportando] = useState(false);
   const [datos, setDatos] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [filtro, setFiltro] = useState('todos');
@@ -64,23 +77,19 @@ export default function PedidosDia() {
   const cargar = useCallback(async () => {
     setCargando(true);
     try {
-      setDatos(await getPedidosJornada(jornadaId));
+      setDatos(rango ? await getPedidosRango(rango.desde, rango.hasta) : await getPedidosJornada(null));
     } catch (err) {
       toast.error(err.message);
     } finally {
       setCargando(false);
     }
-  }, [jornadaId]);
+  }, [rango]);
 
   useEffect(() => { cargar(); }, [cargar]);
 
-  useEffect(() => {
-    if (esAdmin) getHistorialJornadas().then(setHistorial).catch(() => setHistorial([]));
-  }, [esAdmin]);
-
   // En el día abierto la lista se actualiza sola cuando hay pedidos, cobros o anulaciones.
   useEffect(() => {
-    if (jornadaId !== null) return undefined;
+    if (rango !== null) return undefined;
     connectPedidosHub().catch(() => {});
     const quitar = [
       onHubEvent('NuevoPedido', cargar),
@@ -91,7 +100,7 @@ export default function PedidosDia() {
       onHubReconnected(cargar),
     ];
     return () => quitar.forEach((q) => q?.());
-  }, [jornadaId, cargar]);
+  }, [rango, cargar]);
 
   const pedidos = datos?.pedidos ?? [];
   const conteo = useMemo(() => {
@@ -138,6 +147,35 @@ export default function PedidosDia() {
   };
 
   const j = datos?.jornada;
+  // Fechas que muestran los selectores: las del historial elegido o el día de la jornada actual.
+  const fechaJornada = j?.fechaOperativa ? String(j.fechaOperativa).slice(0, 10) : hoyLimaISO();
+  const desde = rango?.desde ?? fechaJornada;
+  const hasta = rango?.hasta ?? fechaJornada;
+  const variosDias = rango !== null && rango.desde !== rango.hasta;
+  const esEsteMes = rango?.desde === inicioMesLima() && rango?.hasta === hoyLimaISO();
+
+  // Si "Desde" queda después de "Hasta" (o al revés), se mueve la otra fecha para que el rango siga siendo válido.
+  const cambiarDesde = (valor) => {
+    if (valor) setRango({ desde: valor, hasta: valor > hasta ? valor : hasta });
+  };
+  const cambiarHasta = (valor) => {
+    if (valor) setRango({ desde: valor < desde ? valor : desde, hasta: valor });
+  };
+
+  const exportarExcel = async () => {
+    setExportando(true);
+    try {
+      await exportarPedidosRango(desde, hasta);
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setExportando(false);
+    }
+  };
+
+  const subtitulo = rango
+    ? `${rango.desde === rango.hasta ? fechaOperativaTexto(rango.desde, true) : `Del ${fechaOperativaTexto(rango.desde, true)} al ${fechaOperativaTexto(rango.hasta, true)}`} · ${datos?.cantidadJornadas ?? 0} ${datos?.cantidadJornadas === 1 ? 'jornada' : 'jornadas'}`
+    : j ? `Jornada del ${fechaOperativaTexto(j.fechaOperativa)} · ${j.estado === 'Abierta' ? 'abierta' : 'cerrada'}` : 'Sin jornadas todavía';
 
   return (
     <div className="min-h-screen bg-background pb-10">
@@ -153,26 +191,9 @@ export default function PedidosDia() {
             <ChevronLeft size={22} />
           </motion.button>
           <div className="flex-1 min-w-[10rem]">
-            <h1 className="text-2xl font-extrabold tracking-tight">Pedidos del día</h1>
-            <p className="text-xs text-gray-500 mt-0.5">
-              {j ? `Jornada del ${fechaOperativaTexto(j.fechaOperativa)} · ${j.estado === 'Abierta' ? 'abierta' : 'cerrada'}` : 'Sin jornadas todavía'}
-            </p>
+            <h1 className="text-2xl font-extrabold tracking-tight">{rango ? 'Historial de pedidos' : 'Pedidos del día'}</h1>
+            <p className="text-xs text-gray-500 mt-0.5">{subtitulo}</p>
           </div>
-          {esAdmin && historial.length > 0 && (
-            <select
-              value={jornadaId ?? ''}
-              onChange={(e) => setJornadaId(e.target.value ? Number(e.target.value) : null)}
-              className="bg-card border border-gray-800/50 rounded-full px-3 py-2 text-xs font-bold text-gray-300 focus:outline-none focus:border-primary"
-              aria-label="Jornada"
-            >
-              <option value="">Jornada actual</option>
-              {historial.map((h) => (
-                <option key={h.jornadaId} value={h.jornadaId}>
-                  {fechaOperativaTexto(h.fechaOperativa, true)}{h.estado === 'Abierta' ? ' (abierta)' : ''}
-                </option>
-              ))}
-            </select>
-          )}
           <motion.button
             whileTap={{ scale: 0.9 }}
             onClick={cargar}
@@ -186,6 +207,33 @@ export default function PedidosDia() {
 
         {/* ── Resumen y filtros ──────────────────────────── */}
         <div className="px-5 space-y-3">
+          {/* Historial por fechas (solo el administrador): se filtra por el día de cada jornada. */}
+          {esAdmin && (
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="flex items-center gap-1.5 text-xs text-gray-500">
+                Desde
+                <input type="date" value={desde} max={hoyLimaISO()} onChange={(e) => cambiarDesde(e.target.value)} className={CLASE_FECHA} />
+              </label>
+              <label className="flex items-center gap-1.5 text-xs text-gray-500">
+                Hasta
+                <input type="date" value={hasta} max={hoyLimaISO()} onChange={(e) => cambiarHasta(e.target.value)} className={CLASE_FECHA} />
+              </label>
+              <button onClick={() => setRango(null)} className={claseAtajo(rango === null)}>Jornada actual</button>
+              <button onClick={() => setRango({ desde: inicioMesLima(), hasta: hoyLimaISO() })} className={claseAtajo(esEsteMes)}>
+                Este mes
+              </button>
+              <button
+                onClick={exportarExcel}
+                disabled={exportando || cargando || pedidos.length === 0}
+                title="Descargar en Excel los pedidos de las fechas elegidas"
+                className="ml-auto flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-bold border bg-card border-gray-800 text-gray-300 hover:border-primary/60 hover:text-primary transition-colors disabled:opacity-40 disabled:pointer-events-none"
+              >
+                <Download size={14} />
+                {exportando ? 'Exportando…' : 'Exportar a Excel'}
+              </button>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-2">
             <div className="bg-card border border-gray-800/50 rounded-2xl px-4 py-3">
               <p className="text-[10px] text-gray-500 uppercase tracking-wider font-bold">Pedidos</p>
@@ -236,7 +284,9 @@ export default function PedidosDia() {
           {!cargando && visibles.length === 0 && (
             <div className="text-center py-10 text-gray-600">
               <ListOrdered size={28} className="mx-auto mb-2" />
-              <p className="text-sm">{pedidos.length === 0 ? 'Todavía no hay pedidos en esta jornada.' : 'Ningún pedido coincide.'}</p>
+              <p className="text-sm">
+                {pedidos.length > 0 ? 'Ningún pedido coincide.' : rango ? 'No hay pedidos en esas fechas.' : 'Todavía no hay pedidos en esta jornada.'}
+              </p>
             </div>
           )}
           {visibles.map((p) => {
@@ -249,7 +299,10 @@ export default function PedidosDia() {
                 onClick={() => abrirDetalle(p)}
                 className={`w-full text-left bg-card border border-gray-800/50 rounded-2xl px-4 py-3 flex items-center gap-3 hover:border-primary/40 transition-colors ${grupo === 'anulados' ? 'opacity-70' : ''}`}
               >
-                <span className="w-16 flex-shrink-0 text-sm font-bold text-gray-400 tabular-nums">{horaLima(p.creadoEn)}</span>
+                <span className="w-16 flex-shrink-0 text-sm font-bold text-gray-400 tabular-nums">
+                  {variosDias && <span className="block text-xs text-gray-500">{diaMes(p.fechaOperativa)}</span>}
+                  {horaLima(p.creadoEn)}
+                </span>
                 <div className="flex-1 min-w-0">
                   <p className="font-extrabold text-ink truncate">
                     {etiquetaMesa(p.salonNombre, p.mesaNumero)} <span className="text-gray-500 font-bold text-sm">· #{p.pedidoId}</span>

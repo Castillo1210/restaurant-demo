@@ -4,6 +4,7 @@
 // ============================================================
 
 import api, { getApiErrorMessage } from './api';
+import { descargarArchivo } from './reportesService';
 
 const llamar = async (promesa, mensaje) => {
   try {
@@ -37,6 +38,24 @@ export const anularMovimiento = (id) =>
 /** Pedidos de la jornada (abiertos, cobrados y anulados). Sin id: la jornada actual. */
 export const getPedidosJornada = (jornadaId) =>
   llamar(api.get('/jornadas/pedidos', { params: jornadaId ? { jornadaId } : {} }), 'No se pudieron cargar los pedidos del día');
+
+/**
+ * Historial de pedidos (ADMIN) de las jornadas entre dos fechas "yyyy-MM-dd", p. ej. un mes entero.
+ * Misma forma que getPedidosJornada, sin `jornada`.
+ */
+export const getPedidosRango = (fechaDesde, fechaHasta) =>
+  llamar(api.get('/jornadas/pedidos', { params: { fechaDesde, fechaHasta } }), 'No se pudo cargar el historial de pedidos');
+
+/** Descarga en Excel el historial de pedidos de las jornadas entre dos fechas "yyyy-MM-dd" (ADMIN). */
+export const exportarPedidosRango = async (fechaDesde, fechaHasta) => {
+  try {
+    const { data } = await api.get('/jornadas/pedidos/exportar', { params: { fechaDesde, fechaHasta }, responseType: 'blob' });
+    const rango = fechaDesde === fechaHasta ? fechaDesde : `${fechaDesde}_a_${fechaHasta}`;
+    descargarArchivo(data, `pedidos_${rango}.xlsx`);
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, 'No se pudo exportar el historial de pedidos'));
+  }
+};
 
 export const getHistorialJornadas = () => llamar(api.get('/jornadas'), 'No se pudo cargar el historial');
 
