@@ -13,6 +13,7 @@ public static class JornadaCalculos
     {
         JornadaId = j.JornadaId,
         FechaOperativa = j.FechaOperativa.Date,
+        Caja = j.Caja,
         Estado = j.Estado,
         AbiertaEn = j.AbiertaEn,
         AbiertaPor = j.AbiertaPor,

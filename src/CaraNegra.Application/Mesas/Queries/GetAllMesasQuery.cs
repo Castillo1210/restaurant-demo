@@ -18,7 +18,8 @@ public class GetAllMesasQueryHandler : IRequestHandler<GetAllMesasQuery, List<Me
 
     public async Task<List<MesaDto>> Handle(GetAllMesasQuery request, CancellationToken cancellationToken)
     {
-        var query = _context.Mesas.Include(m => m.Salon).AsQueryable();
+        // La mesa interna de mostrador (Venta rápida) no es una mesa real: no sale en el mapa.
+        var query = _context.Mesas.Include(m => m.Salon).Where(m => !m.EsMostrador).AsQueryable();
 
         if (request.SoloDisponibles)
         {

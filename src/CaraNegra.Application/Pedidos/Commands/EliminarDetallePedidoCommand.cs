@@ -51,6 +51,7 @@ public class EliminarDetallePedidoCommandHandler : IRequestHandler<EliminarDetal
             .Include(p => p.Usuario)
             .Include(p => p.DetallesPedidos)
                 .ThenInclude(d => d.Producto)
+                    .ThenInclude(pr => pr.Categoria)
             .Include(p => p.Pagos)
                 .ThenInclude(p => p.MetodoPago)
             .Include(p => p.DetallesDescuentos)
@@ -173,7 +174,9 @@ public class EliminarDetallePedidoCommandHandler : IRequestHandler<EliminarDetal
             Total = pedido.Total
         });
 
-        // Aviso a la ticketera de cocina para que no lo preparen (nunca lanza excepción).
+        // Aviso a la ticketera de cocina para que no lo preparen (nunca lanza excepción). Un producto
+        // de mostrador no pasó por cocina: no hay nada que avisar.
+        if (!CaraNegra.Application.Ventas.Mostrador.EsDeMostrador(detalle.Producto))
         await _impresora.ImprimirComandaAsync(new ComandaCocina
         {
             PedidoId = pedido.PedidoId,

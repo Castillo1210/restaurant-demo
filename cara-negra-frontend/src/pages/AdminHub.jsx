@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ChevronLeft, UtensilsCrossed, Table2, BarChart3, Users, Package, Percent, Utensils, ChevronRight, ChefHat, FileText, Trees, Building2, Smartphone, CalendarClock, ListOrdered } from 'lucide-react';
+import { ChevronLeft, UtensilsCrossed, Table2, BarChart3, Users, Package, Percent, Utensils, ChevronRight, ChefHat, FileText, Trees, Building2, Smartphone, CalendarClock, ListOrdered, Zap } from 'lucide-react';
 import { getAmbienteFacturacion } from '../services/comprobantesService';
 
 // Texto de la tarjeta de comprobantes según dónde se emiten de verdad (lo dice el servidor).
@@ -23,6 +23,12 @@ const SECCIONES = [
     icon: ListOrdered,
     title: 'Pedidos del día',
     description: 'Todos los pedidos de la jornada: abiertos, cobrados y anulados',
+  },
+  {
+    to: '/venta-rapida',
+    icon: Zap,
+    title: 'Venta rápida (mostrador)',
+    description: 'Entradas de la piscina, ropa de baño y otros productos sin mesa ni cocina',
   },
   {
     to: '/admin/empresa',

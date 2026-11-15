@@ -35,23 +35,32 @@ export const registrarMovimiento = (datos) =>
 export const anularMovimiento = (id) =>
   llamar(api.post(`/jornadas/movimientos/${id}/anular`), 'No se pudo anular el movimiento');
 
-/** Pedidos de la jornada (abiertos, cobrados y anulados). Sin id: la jornada actual. */
-export const getPedidosJornada = (jornadaId) =>
-  llamar(api.get('/jornadas/pedidos', { params: jornadaId ? { jornadaId } : {} }), 'No se pudieron cargar los pedidos del día');
+/**
+ * Pedidos de la jornada (abiertos, cobrados y anulados). Sin id: la jornada actual.
+ * caja ('Restaurante' | 'Piscina'): solo la usa el ADMIN; el resto ve siempre la de su rol.
+ */
+export const getPedidosJornada = (jornadaId, caja) =>
+  llamar(api.get('/jornadas/pedidos', { params: { jornadaId: jornadaId || undefined, caja: caja || undefined } }),
+    'No se pudieron cargar los pedidos del día');
 
 /**
  * Historial de pedidos (ADMIN) de las jornadas entre dos fechas "yyyy-MM-dd", p. ej. un mes entero.
  * Misma forma que getPedidosJornada, sin `jornada`.
  */
-export const getPedidosRango = (fechaDesde, fechaHasta) =>
-  llamar(api.get('/jornadas/pedidos', { params: { fechaDesde, fechaHasta } }), 'No se pudo cargar el historial de pedidos');
+export const getPedidosRango = (fechaDesde, fechaHasta, caja) =>
+  llamar(api.get('/jornadas/pedidos', { params: { fechaDesde, fechaHasta, caja: caja || undefined } }),
+    'No se pudo cargar el historial de pedidos');
 
 /** Descarga en Excel el historial de pedidos de las jornadas entre dos fechas "yyyy-MM-dd" (ADMIN). */
-export const exportarPedidosRango = async (fechaDesde, fechaHasta) => {
+export const exportarPedidosRango = async (fechaDesde, fechaHasta, caja) => {
   try {
-    const { data } = await api.get('/jornadas/pedidos/exportar', { params: { fechaDesde, fechaHasta }, responseType: 'blob' });
+    const { data } = await api.get('/jornadas/pedidos/exportar', {
+      params: { fechaDesde, fechaHasta, caja: caja || undefined },
+      responseType: 'blob',
+    });
     const rango = fechaDesde === fechaHasta ? fechaDesde : `${fechaDesde}_a_${fechaHasta}`;
-    descargarArchivo(data, `pedidos_${rango}.xlsx`);
+    const sufijo = caja ? `_${caja.toLowerCase()}` : '';
+    descargarArchivo(data, `pedidos_${rango}${sufijo}.xlsx`);
   } catch (error) {
     throw new Error(getApiErrorMessage(error, 'No se pudo exportar el historial de pedidos'));
   }

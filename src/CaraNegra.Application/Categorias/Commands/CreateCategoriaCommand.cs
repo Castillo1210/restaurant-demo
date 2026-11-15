@@ -19,7 +19,8 @@ public class CreateCategoriaCommandHandler : IRequestHandler<CreateCategoriaComm
         {
             Nombre = request.Dto.Nombre,
             Descripcion = request.Dto.Descripcion,
-            EstaActivo = true
+            EstaActivo = true,
+            EsMostrador = request.Dto.EsMostrador
         };
 
         _context.Categorias.Add(categoria);
@@ -31,6 +32,7 @@ public class CreateCategoriaCommandHandler : IRequestHandler<CreateCategoriaComm
             Nombre = categoria.Nombre,
             Descripcion = categoria.Descripcion,
             EstaActivo = categoria.EstaActivo,
+            EsMostrador = categoria.EsMostrador,
             CreadoEn = categoria.CreadoEn
         };
     }

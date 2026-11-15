@@ -16,7 +16,7 @@ namespace CaraNegra.API.Controllers;
 [ApiController]
 [Route("api/v{version:apiVersion}/metodos-pago")]
 [ApiVersion("1.0")]
-[Authorize(Roles = "CAJERO,ADMIN")]
+[Authorize(Roles = "CAJERO,ADMIN,TAQUILLA")]
 public class MetodosPagoController : ControllerBase
 {
     private readonly IMediator _mediator;

@@ -49,8 +49,9 @@ public class GetPedidosCocinaQueryHandler : IRequestHandler<GetPedidosCocinaQuer
         Comentario = p.Comentario,
         CreadoEn = p.CreadoEn,
         ActualizadoEn = p.ActualizadoEn,
+        // Los productos de mostrador (entradas, ropa de baño…) no se preparan: no salen en cocina.
         Items = p.DetallesPedidos
-            .Where(d => d.EstadoDetallePedido != EstadoDetallePedido.Cancelado)
+            .Where(d => d.EstadoDetallePedido != EstadoDetallePedido.Cancelado && CaraNegra.Application.Ventas.Mostrador.VaACocina(d))
             .OrderBy(d => d.CreadoEn)
             .Select(d => new ItemCocinaDto
             {

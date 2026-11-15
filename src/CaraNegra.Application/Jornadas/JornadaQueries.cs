@@ -1,4 +1,5 @@
 using CaraNegra.Application.Common.Interfaces;
+using CaraNegra.Domain.Entities;
 using CaraNegra.Domain.Enums;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -7,7 +8,7 @@ namespace CaraNegra.Application.Jornadas;
 
 // ───────────── Jornada actual (todos los roles) ─────────────
 
-public record GetJornadaActualQuery : IRequest<JornadaActualDto>;
+public record GetJornadaActualQuery(CajaJornada Caja = CajaJornada.Restaurante) : IRequest<JornadaActualDto>;
 
 public class GetJornadaActualQueryHandler : IRequestHandler<GetJornadaActualQuery, JornadaActualDto>
 {
@@ -17,7 +18,7 @@ public class GetJornadaActualQueryHandler : IRequestHandler<GetJornadaActualQuer
 
     public async Task<JornadaActualDto> Handle(GetJornadaActualQuery request, CancellationToken cancellationToken)
     {
-        var jornada = await JornadaReglas.ObtenerAbiertaAsync(_context, cancellationToken);
+        var jornada = await JornadaReglas.ObtenerAbiertaAsync(_context, request.Caja, cancellationToken);
         return new JornadaActualDto
         {
             Abierta = jornada is not null,
@@ -33,7 +34,8 @@ public class GetJornadaActualQueryHandler : IRequestHandler<GetJornadaActualQuer
 /// False para el CAJERO mientras la jornada está abierta (arqueo ciego: no ve lo esperado antes
 /// de contar). Las jornadas cerradas siempre muestran todo.
 /// </param>
-public record GetResumenJornadaQuery(int? JornadaId, bool IncluirMontos) : IRequest<ResumenJornadaDto>;
+public record GetResumenJornadaQuery(int? JornadaId, bool IncluirMontos, CajaJornada Caja = CajaJornada.Restaurante)
+    : IRequest<ResumenJornadaDto>;
 
 public class GetResumenJornadaQueryHandler : IRequestHandler<GetResumenJornadaQuery, ResumenJornadaDto>
 {
@@ -46,7 +48,7 @@ public class GetResumenJornadaQueryHandler : IRequestHandler<GetResumenJornadaQu
         var jornada = request.JornadaId is int id
             ? await _context.Jornadas.AsNoTracking().FirstOrDefaultAsync(j => j.JornadaId == id, cancellationToken)
                 ?? throw new KeyNotFoundException($"Jornada {id} no encontrada")
-            : await JornadaReglas.ObtenerAbiertaAsync(_context, cancellationToken)
+            : await JornadaReglas.ObtenerAbiertaAsync(_context, request.Caja, cancellationToken)
                 ?? throw new KeyNotFoundException("No hay una jornada abierta");
 
         return await JornadaCalculos.ConstruirResumenAsync(_context, jornada, request.IncluirMontos, cancellationToken);
@@ -55,7 +57,7 @@ public class GetResumenJornadaQueryHandler : IRequestHandler<GetResumenJornadaQu
 
 // ───────────── Revisión previa al cierre ─────────────
 
-public record GetPreCierreQuery : IRequest<PreCierreDto>;
+public record GetPreCierreQuery(CajaJornada Caja = CajaJornada.Restaurante) : IRequest<PreCierreDto>;
 
 public class GetPreCierreQueryHandler : IRequestHandler<GetPreCierreQuery, PreCierreDto>
 {
@@ -65,7 +67,7 @@ public class GetPreCierreQueryHandler : IRequestHandler<GetPreCierreQuery, PreCi
 
     public async Task<PreCierreDto> Handle(GetPreCierreQuery request, CancellationToken cancellationToken)
     {
-        var jornada = await JornadaReglas.ObtenerAbiertaAsync(_context, cancellationToken)
+        var jornada = await JornadaReglas.ObtenerAbiertaAsync(_context, request.Caja, cancellationToken)
             ?? throw new KeyNotFoundException("No hay una jornada abierta");
 
         var esperado = await JornadaCalculos.CalcularEsperadoAsync(_context, jornada, cancellationToken);
@@ -77,7 +79,7 @@ public class GetPreCierreQueryHandler : IRequestHandler<GetPreCierreQuery, PreCi
         return new PreCierreDto
         {
             Jornada = JornadaCalculos.ToDto(jornada),
-            PedidosAbiertos = await PedidosAbiertos.ListarAsync(_context, cancellationToken),
+            PedidosAbiertos = await PedidosAbiertos.ListarAsync(_context, jornada, cancellationToken),
             ComprobantesPendientes = comprobantesPendientes,
             // Sin montos: el arqueo es ciego.
             Metodos = esperado.Select(a => new MetodoCierreDto
@@ -111,11 +113,17 @@ public class GetJornadasQueryHandler : IRequestHandler<GetJornadasQuery, List<Jo
     }
 }
 
-/// <summary>Pedidos sin cobrar (Pendiente, En preparación o Listo): bloquean el cierre.</summary>
+/// <summary>
+/// Pedidos sin cobrar (Pendiente, En preparación o Listo) de la caja de esa jornada: bloquean su
+/// cierre. Los pedidos antiguos sin jornada cuentan como del restaurante.
+/// </summary>
 internal static class PedidosAbiertos
 {
-    public static async Task<List<PedidoAbiertoDto>> ListarAsync(IApplicationDbContext context, CancellationToken ct)
+    public static async Task<List<PedidoAbiertoDto>> ListarAsync(IApplicationDbContext context, Jornada jornada, CancellationToken ct)
     {
+        var jornadaId = jornada.JornadaId;
+        var esRestaurante = jornada.Caja == CajaJornada.Restaurante;
+
         // Comparaciones explícitas (no array.Contains) para que EF lo traduzca bien en .NET 10.
         var pedidos = await context.Pedidos
             .AsNoTracking()
@@ -125,6 +133,7 @@ internal static class PedidosAbiertos
             .Where(p => p.EstadoPedido == EstadoPedido.Pendiente
                 || p.EstadoPedido == EstadoPedido.EnPreparacion
                 || p.EstadoPedido == EstadoPedido.Listo)
+            .Where(p => p.JornadaId == jornadaId || (p.JornadaId == null && esRestaurante))
             .OrderBy(p => p.PedidoId)
             .ToListAsync(ct);
 

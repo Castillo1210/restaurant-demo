@@ -41,6 +41,10 @@ public class ImpresoraCocinaService : IImpresoraCocinaService
 
     public async Task<ResultadoImpresion> ImprimirComandaAsync(ComandaCocina comanda, CancellationToken cancellationToken = default)
     {
+        // Nada para cocina (p. ej. solo productos de mostrador: entradas, flotadores…): no se imprime.
+        if (comanda.Items.Count == 0 && !comanda.EsCambioComentario)
+            return ResultadoImpresion.Impresa;
+
         // Pedido del administrador o del cajero: la comanda la imprime su propio equipo en su
         // ticketera, igual que la boleta. Aquí no se manda nada a la ticketera de cocina.
         if (comanda.ParaCaja)

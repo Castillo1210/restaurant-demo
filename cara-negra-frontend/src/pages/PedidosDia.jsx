@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, Search, X, RefreshCw, ReceiptText, FileText, MessageSquareText, Ban, Receipt, ListOrdered, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { getPedidosJornada, getPedidosRango, exportarPedidosRango } from '../services/jornadaService';
-import { getPedidoById } from '../services/ordersService';
+import { getPedidoById, getVentaMostradorById } from '../services/ordersService';
 import { getComprobanteDePedido } from '../services/comprobantesService';
 import { connectPedidosHub, onHubEvent, onHubReconnected } from '../services/signalrService';
 import { useAuth } from '../context/AuthContext';
@@ -59,9 +59,12 @@ export default function PedidosDia() {
   const { user } = useAuth();
   const empresa = useEmpresa();
   const esAdmin = user?.rol === 'ADMIN';
+  const esTaquilla = user?.rol === 'TAQUILLA';
 
   // null = la jornada actual (se actualiza en vivo); { desde, hasta } = historial de esas fechas (solo ADMIN).
   const [rango, setRango] = useState(null);
+  // Caja (solo ADMIN): 'Restaurante', 'Piscina' o '' = las dos (solo en el historial por fechas).
+  const [caja, setCaja] = useState('Restaurante');
   const [exportando, setExportando] = useState(false);
   const [datos, setDatos] = useState(null);
   const [cargando, setCargando] = useState(true);
@@ -77,13 +80,16 @@ export default function PedidosDia() {
   const cargar = useCallback(async () => {
     setCargando(true);
     try {
-      setDatos(rango ? await getPedidosRango(rango.desde, rango.hasta) : await getPedidosJornada(null));
+      const cajaPedida = esAdmin ? caja : '';
+      setDatos(rango
+        ? await getPedidosRango(rango.desde, rango.hasta, cajaPedida)
+        : await getPedidosJornada(null, cajaPedida || 'Restaurante'));
     } catch (err) {
       toast.error(err.message);
     } finally {
       setCargando(false);
     }
-  }, [rango]);
+  }, [rango, caja, esAdmin]);
 
   useEffect(() => { cargar(); }, [cargar]);
 
@@ -126,7 +132,8 @@ export default function PedidosDia() {
     setCargandoDetalle(true);
     setDetalle({ id: p.pedidoId, resumen: p });
     try {
-      const completo = await getPedidoById(p.pedidoId);
+      // La taquilla no tiene acceso a /pedidos: lee sus ventas por /ventas.
+      const completo = await (esTaquilla ? getVentaMostradorById : getPedidoById)(p.pedidoId);
       setDetalle({ ...completo, resumen: p });
     } catch {
       toast.error('No se pudo abrir el pedido');
@@ -165,7 +172,7 @@ export default function PedidosDia() {
   const exportarExcel = async () => {
     setExportando(true);
     try {
-      await exportarPedidosRango(desde, hasta);
+      await exportarPedidosRango(desde, hasta, caja);
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -191,7 +198,9 @@ export default function PedidosDia() {
             <ChevronLeft size={22} />
           </motion.button>
           <div className="flex-1 min-w-[10rem]">
-            <h1 className="text-2xl font-extrabold tracking-tight">{rango ? 'Historial de pedidos' : 'Pedidos del día'}</h1>
+            <h1 className="text-2xl font-extrabold tracking-tight">
+              {rango ? 'Historial de pedidos' : esTaquilla ? 'Ventas de hoy' : 'Pedidos del día'}
+            </h1>
             <p className="text-xs text-gray-500 mt-0.5">{subtitulo}</p>
           </div>
           <motion.button
@@ -218,7 +227,9 @@ export default function PedidosDia() {
                 Hasta
                 <input type="date" value={hasta} max={hoyLimaISO()} onChange={(e) => cambiarHasta(e.target.value)} className={CLASE_FECHA} />
               </label>
-              <button onClick={() => setRango(null)} className={claseAtajo(rango === null)}>Jornada actual</button>
+              <button onClick={() => { setRango(null); if (caja === '') setCaja('Restaurante'); }} className={claseAtajo(rango === null)}>
+                Jornada actual
+              </button>
               <button onClick={() => setRango({ desde: inicioMesLima(), hasta: hoyLimaISO() })} className={claseAtajo(esEsteMes)}>
                 Este mes
               </button>
@@ -231,6 +242,19 @@ export default function PedidosDia() {
                 <Download size={14} />
                 {exportando ? 'Exportando…' : 'Exportar a Excel'}
               </button>
+              {/* Caja: la del restaurante o la de la piscina (en el historial, también las dos juntas). */}
+              <div className="w-full flex flex-wrap items-center gap-2">
+                <span className="text-xs text-gray-500">Caja</span>
+                {[
+                  { valor: 'Restaurante', texto: 'Restaurante' },
+                  { valor: 'Piscina', texto: 'Piscina' },
+                  ...(rango ? [{ valor: '', texto: 'Las dos' }] : []),
+                ].map((o) => (
+                  <button key={o.texto} onClick={() => setCaja(o.valor)} className={claseAtajo(caja === o.valor)}>
+                    {o.texto}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
@@ -306,6 +330,9 @@ export default function PedidosDia() {
                 <div className="flex-1 min-w-0">
                   <p className="font-extrabold text-ink truncate">
                     {etiquetaMesa(p.salonNombre, p.mesaNumero)} <span className="text-gray-500 font-bold text-sm">· #{p.pedidoId}</span>
+                    {esAdmin && rango && caja === '' && p.caja === 'Piscina' && (
+                      <span className="ml-2 text-[10px] font-bold uppercase tracking-wider text-sky-400 border border-sky-800/60 rounded-full px-1.5 py-0.5 align-middle">Piscina</span>
+                    )}
                   </p>
                   <p className="text-xs text-gray-500 truncate">
                     {p.mozo} · {p.cantidadPlatos} {p.cantidadPlatos === 1 ? 'plato' : 'platos'}

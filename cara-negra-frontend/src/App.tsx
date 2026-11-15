@@ -28,6 +28,7 @@ import JornadaGate from './components/JornadaGate';
 import { JornadaProvider } from './context/JornadaContext';
 import CierreInactividad from './components/CierreInactividad';
 import AvisoImpresora from './components/AvisoImpresora';
+import VentaRapida from './pages/VentaRapida';
 
 function App() {
   return (
@@ -91,9 +92,17 @@ function App() {
               }
             />
             <Route
+              path="/venta-rapida"
+              element={
+                <RequireAuth roles={['TAQUILLA', 'CAJERO', 'ADMIN']}>
+                  <VentaRapida />
+                </RequireAuth>
+              }
+            />
+            <Route
               path="/pedidos-dia"
               element={
-                <RequireAuth roles={['CAJERO', 'ADMIN']}>
+                <RequireAuth roles={['CAJERO', 'ADMIN', 'TAQUILLA']}>
                   <PedidosDia />
                 </RequireAuth>
               }
@@ -157,7 +166,7 @@ function App() {
             <Route
               path="/jornada"
               element={
-                <RequireAuth roles={['ADMIN', 'CAJERO']}>
+                <RequireAuth roles={['ADMIN', 'CAJERO', 'TAQUILLA']}>
                   <Jornada />
                 </RequireAuth>
               }

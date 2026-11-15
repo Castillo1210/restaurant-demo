@@ -16,6 +16,12 @@ public class Mesa : BaseEntity
     // "Salón principal" al arrancar); crear o editar una mesa SIEMPRE exige un salón.
     public int? SalonId { get; set; }
 
+    /// <summary>
+    /// Mesa interna para las ventas de mostrador (Venta rápida): no aparece en el mapa de mesas,
+    /// no tiene salón y nunca queda ocupada. La crea MostradorSeeder al arrancar.
+    /// </summary>
+    public bool EsMostrador { get; set; }
+
     // Propiedades de Navegacion
     public Salon? Salon { get; set; }
     public ICollection<Pedido> Pedidos { get; set; } = new List<Pedido>();

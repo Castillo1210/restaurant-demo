@@ -15,6 +15,7 @@ const mapCategoria = (c) => ({
   nombre: c.nombre,
   descripcion: c.descripcion ?? '',
   estaActivo: c.estaActivo,
+  esMostrador: !!c.esMostrador,
   creadoEn: c.creadoEn,
 });
 
@@ -47,21 +48,22 @@ export const getCategoriasAdmin = async () => {
   }
 };
 
-export const createCategoria = async ({ nombre, descripcion }) => {
+export const createCategoria = async ({ nombre, descripcion, esMostrador = false }) => {
   try {
-    const { data } = await api.post('/categorias', { nombre, descripcion: descripcion || '' });
+    const { data } = await api.post('/categorias', { nombre, descripcion: descripcion || '', esMostrador: !!esMostrador });
     return mapCategoria(data);
   } catch (error) {
     throw new Error(getApiErrorMessage(error, 'No se pudo crear la categoría'));
   }
 };
 
-export const updateCategoria = async (id, { nombre, descripcion, estaActivo }) => {
+export const updateCategoria = async (id, { nombre, descripcion, estaActivo, esMostrador = false }) => {
   try {
     const { data } = await api.put(`/categorias/${id}`, {
       nombre,
       descripcion: descripcion || '',
       estaActivo,
+      esMostrador: !!esMostrador,
     });
     return mapCategoria(data);
   } catch (error) {

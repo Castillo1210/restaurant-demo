@@ -6,6 +6,8 @@ public class JornadaDto
 {
     public int JornadaId { get; set; }
     public DateTime FechaOperativa { get; set; }
+    /// <summary>Restaurante o Piscina.</summary>
+    public CajaJornada Caja { get; set; }
     public EstadoJornada Estado { get; set; }
     public DateTime AbiertaEn { get; set; }
     public string AbiertaPor { get; set; } = string.Empty;

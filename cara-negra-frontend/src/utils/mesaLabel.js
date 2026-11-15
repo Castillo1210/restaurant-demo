@@ -12,6 +12,8 @@ export const prefijoSalon = (salonNombre) => (salonNombre ?? '').trim().split(/\
 
 /** Etiqueta completa de la mesa: "Terraza 1" (o "Mesa 1" si no tiene salón). */
 export const etiquetaMesa = (salonNombre, mesaNumero) => {
+  // Ventas de "Venta rápida" (piscina): quedan en una mesa interna de mostrador.
+  if (mesaNumero === 'MOSTRADOR') return 'Mostrador';
   const numero = mesaNumero != null && mesaNumero !== '' ? mesaNumero : '—';
   const prefijo = prefijoSalon(salonNombre);
   return `${prefijo || 'Mesa'} ${numero}`;

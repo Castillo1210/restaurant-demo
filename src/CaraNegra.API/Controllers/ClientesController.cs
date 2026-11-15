@@ -14,7 +14,7 @@ namespace CaraNegra.API.Controllers;
 [ApiController]
 [Route("api/v{version:apiVersion}/clientes")]
 [ApiVersion("1.0")]
-[Authorize(Roles = "CAJERO,ADMIN")]
+[Authorize(Roles = "CAJERO,ADMIN,TAQUILLA")]
 public class ClientesController : ControllerBase
 {
     private readonly IMediator _mediator;

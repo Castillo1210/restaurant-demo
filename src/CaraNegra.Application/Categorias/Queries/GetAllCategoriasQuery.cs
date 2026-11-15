@@ -28,6 +28,7 @@ public class GetAllCategoriasQueryHandler : IRequestHandler<GetAllCategoriasQuer
             Nombre = c.Nombre,
             Descripcion = c.Descripcion,
             EstaActivo = c.EstaActivo,
+            EsMostrador = c.EsMostrador,
             CreadoEn = c.CreadoEn
         }).ToListAsync(cancellationToken);
     }

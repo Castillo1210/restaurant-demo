@@ -101,6 +101,7 @@ public class CreatePedidoCommandHandler : IRequestHandler<CreatePedidoCommand, P
         foreach (var detalleDto in request.Dto.Detalles)
         {
             var producto = await _context.Productos
+                .Include(p => p.Categoria)
                 .FirstOrDefaultAsync(p => p.ProductoId == detalleDto.ProductoId, cancellationToken)
                 ?? throw new KeyNotFoundException($"Producto {detalleDto.ProductoId} no encontrado");
 
@@ -115,7 +116,10 @@ public class CreatePedidoCommandHandler : IRequestHandler<CreatePedidoCommand, P
                 Cantidad = detalleDto.Cantidad,
                 Monto = producto.Precio,
                 Notas = NotaPlato.Normalizar(detalleDto.Notas),
-                EstadoDetallePedido = EstadoDetallePedido.Pendiente
+                // Un producto de mostrador se entrega en el momento: no pasa por cocina.
+                EstadoDetallePedido = CaraNegra.Application.Ventas.Mostrador.EsDeMostrador(producto)
+                    ? EstadoDetallePedido.Entregado
+                    : EstadoDetallePedido.Pendiente
             };
 
             // Precio distinto al de la carta: solo cajero / admin, y queda registrado.
@@ -180,6 +184,7 @@ public class CreatePedidoCommandHandler : IRequestHandler<CreatePedidoCommand, P
             .Include(p => p.Usuario)
             .Include(p => p.DetallesPedidos)
                 .ThenInclude(d => d.Producto)
+                    .ThenInclude(pr => pr.Categoria)
             .FirstAsync(p => p.PedidoId == pedido.PedidoId, cancellationToken);
 
         await _hub.NotificarNuevoPedido(new NuevoPedidoEvent
@@ -209,7 +214,8 @@ public class CreatePedidoCommandHandler : IRequestHandler<CreatePedidoCommand, P
             EsAdicional = false,
             ParaCaja = request.ComandaEnCaja,
             Comentario = pedidoCreado.Comentario,
-            Items = pedidoCreado.DetallesPedidos.Select(d => new ItemComanda
+            // Solo lo que cocina prepara (sin productos de mostrador); sin nada para cocina no se imprime.
+            Items = pedidoCreado.DetallesPedidos.Where(CaraNegra.Application.Ventas.Mostrador.VaACocina).Select(d => new ItemComanda
             {
                 ProductoNombre = d.Producto?.Nombre ?? string.Empty,
                 Cantidad = d.Cantidad,

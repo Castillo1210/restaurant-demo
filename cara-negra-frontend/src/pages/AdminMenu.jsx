@@ -96,13 +96,16 @@ export default function AdminMenu() {
       type: 'categoria',
       mode: categoria ? 'editar' : 'crear',
       data: categoria
-        ? { id: categoria.id, nombre: categoria.nombre, descripcion: categoria.descripcion, estaActivo: categoria.estaActivo }
-        : { nombre: '', descripcion: '' },
+        ? {
+          id: categoria.id, nombre: categoria.nombre, descripcion: categoria.descripcion,
+          estaActivo: categoria.estaActivo, esMostrador: categoria.esMostrador,
+        }
+        : { nombre: '', descripcion: '', esMostrador: false },
     });
   };
 
   const guardarCategoria = async () => {
-    const { nombre, descripcion } = form.data;
+    const { nombre, descripcion, esMostrador } = form.data;
     if (!nombre.trim()) {
       toast.error('El nombre de la categoría es obligatorio');
       return;
@@ -110,13 +113,14 @@ export default function AdminMenu() {
     setIsSaving(true);
     try {
       if (form.mode === 'crear') {
-        await createCategoria({ nombre: nombre.trim(), descripcion });
+        await createCategoria({ nombre: nombre.trim(), descripcion, esMostrador });
         toast.success('Categoría creada');
       } else {
         await updateCategoria(form.data.id, {
           nombre: nombre.trim(),
           descripcion,
           estaActivo: form.data.estaActivo,
+          esMostrador,
         });
         toast.success('Categoría actualizada');
       }
@@ -136,6 +140,7 @@ export default function AdminMenu() {
         nombre: categoria.nombre,
         descripcion: categoria.descripcion,
         estaActivo: !categoria.estaActivo,
+        esMostrador: categoria.esMostrador,
       });
       toast.success(categoria.estaActivo ? 'Categoría desactivada' : 'Categoría reactivada');
       cargarTodo();
@@ -331,6 +336,9 @@ export default function AdminMenu() {
                 {!cat.estaActivo && (
                   <span className="inline-block text-[10px] font-bold text-gray-500 uppercase tracking-wider mt-1">Inactiva</span>
                 )}
+                {cat.esMostrador && (
+                  <span className="inline-block text-[10px] font-bold text-sky-400 uppercase tracking-wider mt-1 ml-2">Mostrador · no va a cocina</span>
+                )}
               </div>
               <div className="flex items-center gap-1.5 flex-shrink-0">
                 <button
@@ -508,6 +516,22 @@ export default function AdminMenu() {
                         className="w-full bg-background border border-gray-700/50 rounded-2xl px-4 py-3.5 text-ink placeholder-gray-600 focus:outline-none focus:border-primary transition-colors text-sm resize-none"
                       />
                     </div>
+                    {/* Piscina, ropa de baño, flotadores…: se venden en "Venta rápida" y no imprimen comanda. */}
+                    <label className="flex items-start gap-3 bg-background border border-gray-700/50 rounded-2xl px-4 py-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={!!form.data.esMostrador}
+                        onChange={(e) => setForm({ ...form, data: { ...form.data, esMostrador: e.target.checked } })}
+                        className="mt-0.5 w-4 h-4 accent-orange-500"
+                      />
+                      <span className="text-sm">
+                        <span className="font-bold text-ink">Venta de mostrador (no va a cocina)</span>
+                        <span className="block text-xs text-gray-500 mt-0.5">
+                          Para entradas de la piscina, ropa de baño, flotadores… Sus productos salen en "Venta rápida",
+                          no imprimen comanda ni aparecen en la pantalla de cocina.
+                        </span>
+                      </span>
+                    </label>
                   </>
                 ) : (
                   <>

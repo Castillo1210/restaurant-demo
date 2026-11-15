@@ -422,6 +422,9 @@ try
         // Datos de la empresa: la primera vez se copian de appsettings a la BD.
         await EmpresaSeeder.SeedAsync(app.Services);
 
+        // Mesa interna para las ventas de mostrador (Venta rápida de la piscina).
+        await MostradorSeeder.AsegurarMesaMostradorAsync(app.Services);
+
         // Mesas creadas antes de existir los salones → "Salón principal".
         await SalonSeeder.AsignarMesasSinSalonAsync(app.Services);
     }

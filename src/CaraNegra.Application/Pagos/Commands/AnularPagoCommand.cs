@@ -106,7 +106,7 @@ public class AnularPagoCommandHandler : IRequestHandler<AnularPagoCommand, PagoD
 
             // Ocupar mesa nuevamente
             var mesa = await _context.Mesas.FindAsync(new object[] { mesaId }, cancellationToken);
-            mesaReocupada = MesaOcupacion.Ocupar(mesa);
+            mesaReocupada = mesa is { EsMostrador: false } && MesaOcupacion.Ocupar(mesa);
         }
         else if (totalPagado == 0)
         {

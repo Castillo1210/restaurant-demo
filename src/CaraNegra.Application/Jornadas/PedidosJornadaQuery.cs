@@ -11,7 +11,8 @@ namespace CaraNegra.Application.Jornadas;
 /// lista simple para consultar rápido desde Caja. Sin <paramref name="JornadaId"/> usa la jornada
 /// abierta o, si no hay, la última cerrada. Solo el ADMIN puede pedir otra jornada.
 /// </summary>
-public record GetPedidosJornadaQuery(int? JornadaId, bool EsAdmin) : IRequest<PedidosJornadaDto>;
+public record GetPedidosJornadaQuery(int? JornadaId, bool EsAdmin, CajaJornada Caja = CajaJornada.Restaurante)
+    : IRequest<PedidosJornadaDto>;
 
 /// <summary>
 /// Historial de pedidos (ADMIN): todos los pedidos de las jornadas cuya fecha operativa está entre
@@ -19,7 +20,9 @@ public record GetPedidosJornadaQuery(int? JornadaId, bool EsAdmin) : IRequest<Pe
 /// por jornada y no por la hora del pedido, igual que el cierre de caja: lo vendido pasada la
 /// medianoche cuenta en el día en que se abrió la jornada.
 /// </summary>
-public record GetPedidosRangoQuery(DateTime FechaDesde, DateTime FechaHasta, bool EsAdmin) : IRequest<PedidosJornadaDto>;
+/// <param name="Caja">Solo las jornadas de esa caja (null = restaurante y piscina).</param>
+public record GetPedidosRangoQuery(DateTime FechaDesde, DateTime FechaHasta, bool EsAdmin, CajaJornada? Caja = null)
+    : IRequest<PedidosJornadaDto>;
 
 public class PedidosJornadaDto
 {
@@ -37,6 +40,8 @@ public class PedidoJornadaDto
     public int PedidoId { get; set; }
     /// <summary>Día de la jornada a la que pertenece el pedido.</summary>
     public DateTime? FechaOperativa { get; set; }
+    /// <summary>Caja de esa jornada (restaurante o piscina).</summary>
+    public CajaJornada Caja { get; set; }
     public string MesaNumero { get; set; } = string.Empty;
     public string SalonNombre { get; set; } = string.Empty;
     public string Mozo { get; set; } = string.Empty;
@@ -72,8 +77,10 @@ public class GetPedidosJornadaQueryHandler : IRequestHandler<GetPedidosJornadaQu
         var jornada = request.JornadaId is int id
             ? await jornadas.FirstOrDefaultAsync(j => j.JornadaId == id, cancellationToken)
                 ?? throw new KeyNotFoundException($"Jornada {id} no encontrada")
-            : await jornadas.Where(j => j.Estado == EstadoJornada.Abierta).OrderByDescending(j => j.AbiertaEn).FirstOrDefaultAsync(cancellationToken)
-                ?? await jornadas.OrderByDescending(j => j.AbiertaEn).FirstOrDefaultAsync(cancellationToken);
+            : await jornadas.Where(j => j.Estado == EstadoJornada.Abierta && j.Caja == request.Caja)
+                    .OrderByDescending(j => j.AbiertaEn).FirstOrDefaultAsync(cancellationToken)
+                ?? await jornadas.Where(j => j.Caja == request.Caja)
+                    .OrderByDescending(j => j.AbiertaEn).FirstOrDefaultAsync(cancellationToken);
 
         if (jornada == null) return new PedidosJornadaDto();
 
@@ -83,7 +90,7 @@ public class GetPedidosJornadaQueryHandler : IRequestHandler<GetPedidosJornadaQu
 
         var pedidos = await PedidosJornadaListado.ListarAsync(
             _context.Pedidos.Where(p => p.JornadaId == jornada.JornadaId),
-            new Dictionary<int, DateTime> { [jornada.JornadaId] = jornada.FechaOperativa },
+            new Dictionary<int, (DateTime Fecha, CajaJornada Caja)> { [jornada.JornadaId] = (jornada.FechaOperativa, jornada.Caja) },
             cancellationToken);
 
         return new PedidosJornadaDto
@@ -117,11 +124,16 @@ public class GetPedidosRangoQueryHandler : IRequestHandler<GetPedidosRangoQuery,
             throw new ArgumentException($"El rango no puede pasar de {MaxDias} días.");
 
         var finExclusivo = hasta.AddDays(1);
-        var fechasJornada = await _context.Jornadas
+        var consulta = _context.Jornadas
             .AsNoTracking()
-            .Where(j => j.FechaOperativa >= desde && j.FechaOperativa < finExclusivo)
-            .Select(j => new { j.JornadaId, j.FechaOperativa })
-            .ToDictionaryAsync(j => j.JornadaId, j => j.FechaOperativa, cancellationToken);
+            .Where(j => j.FechaOperativa >= desde && j.FechaOperativa < finExclusivo);
+        if (request.Caja is CajaJornada caja)
+            consulta = consulta.Where(j => j.Caja == caja);
+
+        var fechasJornada = (await consulta
+                .Select(j => new { j.JornadaId, j.FechaOperativa, j.Caja })
+                .ToListAsync(cancellationToken))
+            .ToDictionary(j => j.JornadaId, j => (Fecha: j.FechaOperativa, Caja: j.Caja));
 
         var ids = fechasJornada.Keys.ToList();
         var pedidos = ids.Count == 0
@@ -145,7 +157,7 @@ public class GetPedidosRangoQueryHandler : IRequestHandler<GetPedidosRangoQuery,
 internal static class PedidosJornadaListado
 {
     public static async Task<List<PedidoJornadaDto>> ListarAsync(IQueryable<Pedido> consulta,
-        IReadOnlyDictionary<int, DateTime> fechasJornada, CancellationToken cancellationToken)
+        IReadOnlyDictionary<int, (DateTime Fecha, CajaJornada Caja)> fechasJornada, CancellationToken cancellationToken)
     {
         var pedidos = await consulta
             .AsNoTracking()
@@ -175,7 +187,10 @@ internal static class PedidosJornadaListado
         return pedidos.Select(p => new PedidoJornadaDto
             {
                 PedidoId = p.PedidoId,
-                FechaOperativa = p.JornadaId is int jornadaId && fechasJornada.TryGetValue(jornadaId, out var fecha) ? fecha : null,
+                FechaOperativa = p.JornadaId is int jornadaId && fechasJornada.TryGetValue(jornadaId, out var datosJornada)
+                    ? datosJornada.Fecha : null,
+                Caja = p.JornadaId is int idJornada && fechasJornada.TryGetValue(idJornada, out var datos)
+                    ? datos.Caja : CajaJornada.Restaurante,
                 MesaNumero = p.MesaNumero,
                 SalonNombre = p.SalonNombre,
                 Mozo = p.Mozo,

@@ -21,6 +21,7 @@ public class UpdateCategoriaCommandHandler : IRequestHandler<UpdateCategoriaComm
         categoria.Nombre = request.Dto.Nombre;
         categoria.Descripcion = request.Dto.Descripcion;
         categoria.EstaActivo = request.Dto.EstaActivo;
+        categoria.EsMostrador = request.Dto.EsMostrador;
 
         await _context.SaveChangesAsync(cancellationToken);
 
@@ -30,6 +31,7 @@ public class UpdateCategoriaCommandHandler : IRequestHandler<UpdateCategoriaComm
             Nombre = categoria.Nombre,
             Descripcion = categoria.Descripcion,
             EstaActivo = categoria.EstaActivo,
+            EsMostrador = categoria.EsMostrador,
             CreadoEn = categoria.CreadoEn
         };
     }
