@@ -191,7 +191,11 @@ public class ImpresoraCocinaService : IImpresoraCocinaService
         _ => Columnas
     };
 
-    private List<Linea> ArmarComanda(ComandaCocina comanda)
+    /// <param name="platosEnUnaLinea">
+    /// Modo imagen: cada plato (y su nota) en UNA sola línea; si no entra, se achica la letra de
+    /// esa línea en vez de pasar a la siguiente.
+    /// </param>
+    private List<Linea> ArmarComanda(ComandaCocina comanda, bool platosEnUnaLinea = false)
     {
         var columnas = Columnas;
         var lineas = new List<Linea>();
@@ -265,18 +269,26 @@ public class ImpresoraCocinaService : IImpresoraCocinaService
         // cocina solo tiene que reconocer los platos → siempre letra normal.
         var tam = comanda.EsAnulacion ? Tamano.Normal : TamanoProductos;
         var ancho = AnchoDe(tam);
-        // En Intermedia (fuente B a doble tamaño) la negrita empasta la letra: va sin negrita.
-        var negrita = tam != Tamano.Intermedio;
+        // Los platos van siempre sin negrita, en cualquier tamaño.
+        const bool negrita = false;
         foreach (var item in comanda.Items)
         {
             var prefijo = $"{item.Cantidad} x ";
-            foreach (var parte in Envolver(prefijo + item.ProductoNombre, ancho, new string(' ', prefijo.Length)))
+            var textoPlato = prefijo + item.ProductoNombre.Trim();
+            var partesPlato = platosEnUnaLinea
+                ? new List<string> { textoPlato }
+                : Envolver(textoPlato, ancho, new string(' ', prefijo.Length));
+            foreach (var parte in partesPlato)
                 lineas.Add(new Linea(parte, tam, Negrita: negrita, Producto: true));
 
             // La nota del plato ("sin cebolla") justo debajo, del mismo tamaño y marcada con ">>".
             if (!string.IsNullOrWhiteSpace(item.Notas))
-                foreach (var parte in Envolver($">> {item.Notas!.Trim()}", ancho, "   "))
+            {
+                var textoNota = $">> {item.Notas!.Trim()}";
+                var partesNota = platosEnUnaLinea ? new List<string> { textoNota } : Envolver(textoNota, ancho, "   ");
+                foreach (var parte in partesNota)
                     lineas.Add(new Linea(parte, tam, Negrita: negrita, Producto: true));
+            }
         }
 
         lineas.Add(new Linea(separador));
@@ -360,7 +372,7 @@ public class ImpresoraCocinaService : IImpresoraCocinaService
     private static float PuntosDe(Linea linea) => linea.Producto
         ? linea.Tam switch
         {
-            Tamano.Grande => 38f,
+            Tamano.Grande => 34f,
             Tamano.Intermedio => 30f,
             Tamano.Alto => 26f,
             _ => 22f
@@ -422,7 +434,7 @@ public class ImpresoraCocinaService : IImpresoraCocinaService
         // 1) Medir: cada línea con su tamaño de letra, reducido si no entra a lo ancho.
         var plan = new List<(Linea Linea, float Letra, float Alto)>();
         float altoTotal = 0;
-        foreach (var linea in ArmarComanda(comanda))
+        foreach (var linea in ArmarComanda(comanda, platosEnUnaLinea: true))
         {
             float letra = 0, alto;
             if (EsSeparador(linea))
