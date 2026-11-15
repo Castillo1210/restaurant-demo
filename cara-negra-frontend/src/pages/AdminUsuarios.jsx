@@ -51,6 +51,7 @@ function ChecklistPassword({ password }) {
 const ROL_STYLES = {
   ADMIN: 'text-primary',
   CAJERO: 'text-accentYellow',
+  TAQUILLA: 'text-sky-400',
   MOZO: 'text-accentGreen',
   COCINA: 'text-sky-400',
 };

@@ -247,7 +247,7 @@ public static class ReportesExcelBuilder
         var encabezados = new[]
         {
             "Día (jornada)", "Hora", "Pedido #", "Salón", "Mesa", "Mozo", "Platos", "Estado",
-            "Total (S/)", "Cobrado (S/)", "Medios de pago", "Comprobante", "Comentario"
+            "Total (S/)", "Cobrado (S/)", "Medios de pago", "Comprobante", "Comentario", "Caja"
         };
         for (var c = 0; c < encabezados.Length; c++)
         {
@@ -274,6 +274,7 @@ public static class ReportesExcelBuilder
             hoja.Cell(fila, 11).Value = string.Join(" + ", p.MetodosPago);
             hoja.Cell(fila, 12).Value = p.Comprobante?.Numero ?? string.Empty;
             hoja.Cell(fila, 13).Value = p.Comentario ?? string.Empty;
+            hoja.Cell(fila, 14).Value = p.Caja == CajaJornada.Piscina ? "Piscina" : "Restaurante";
 
             if (p.Estado == EstadoPedido.Cancelado)
             {

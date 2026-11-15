@@ -52,6 +52,7 @@ export default function Jornada() {
   const { user } = useAuth();
   const { abierta, jornada, cargada, recargar } = useJornada();
   const esAdmin = user?.rol === 'ADMIN';
+  const esTaquilla = user?.rol === 'TAQUILLA';
 
   const [resumen, setResumen] = useState(null);
   const [historial, setHistorial] = useState([]);
@@ -144,8 +145,10 @@ export default function Jornada() {
           <ChevronLeft size={22} />
         </motion.button>
         <div>
-          <h1 className="text-2xl font-extrabold tracking-tight">Jornada y caja</h1>
-          <p className="text-xs text-gray-500 mt-0.5">Apertura del día, movimientos de caja y cierre</p>
+          <h1 className="text-2xl font-extrabold tracking-tight">{esTaquilla ? 'Caja de la piscina' : 'Jornada y caja'}</h1>
+          <p className="text-xs text-gray-500 mt-0.5">
+            {esTaquilla ? 'Apertura, movimientos de efectivo y cierre de tu caja' : 'Apertura del día, movimientos de caja y cierre'}
+          </p>
         </div>
       </div>
 
@@ -154,7 +157,11 @@ export default function Jornada() {
           <p className="text-sm text-gray-500 flex items-center gap-2"><Loader2 size={15} className="animate-spin" /> Cargando…</p>
         ) : !abierta ? (
           <Tarjeta titulo="No hay jornada abierta" icon={CalendarClock}>
-            <p className="text-xs text-gray-400">Abre el día para que los mozos puedan tomar pedidos y caja pueda cobrar.</p>
+            <p className="text-xs text-gray-400">
+              {esTaquilla
+                ? 'Abre tu caja con el fondo de caja para empezar a vender en la piscina.'
+                : 'Abre el día para que los mozos puedan tomar pedidos y caja pueda cobrar.'}
+            </p>
             <AbrirJornadaForm onAbierta={() => recargar()} />
           </Tarjeta>
         ) : (
@@ -335,7 +342,12 @@ export default function Jornada() {
                     className="w-full flex items-center gap-3 bg-background/60 border border-gray-800/60 rounded-xl px-3 py-2.5 text-left hover:border-primary/40 disabled:hover:border-gray-800/60"
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-ink">{fechaOperativaTexto(h.fechaOperativa, true)}</p>
+                      <p className="text-sm font-bold text-ink">
+                        {fechaOperativaTexto(h.fechaOperativa, true)}
+                        {h.caja === 'Piscina' && (
+                          <span className="ml-2 text-[10px] font-bold uppercase tracking-wider text-sky-400 border border-sky-800/60 rounded-full px-1.5 py-0.5">Piscina</span>
+                        )}
+                      </p>
                       <p className="text-[11px] text-gray-500 truncate">
                         {cerrada ? `${h.cantidadPedidos} pedidos · cerró ${h.cerradaPor}` : `Abierta · ${h.abiertaPor}`}
                       </p>

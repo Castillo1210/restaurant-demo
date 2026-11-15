@@ -96,6 +96,12 @@ export const getPedidoById = async (id) => {
   return { ...mapPedido(data), anulados, cambiosPrecio };
 };
 
+/** Venta de mostrador (taquilla): GET /ventas/{id}, que solo devuelve pedidos del mostrador. */
+export const getVentaMostradorById = async (id) => {
+  const { data } = await api.get(`/ventas/${id}`);
+  return { ...mapPedido(data), anulados: [], cambiosPrecio: [] };
+};
+
 /** Precios distintos a la carta en un pedido (quién, cuándo, de cuánto a cuánto). [] si falla. */
 export const getCambiosPrecioPedido = async (pedidoId) => {
   try {

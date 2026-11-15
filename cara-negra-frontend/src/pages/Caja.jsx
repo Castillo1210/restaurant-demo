@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Receipt, X, Ban, ReceiptText, Tag, FileText, CalendarClock, Printer, MessageSquareText, ListOrdered, AlertTriangle, Clock } from 'lucide-react';
+import { ChevronLeft, Receipt, X, Ban, ReceiptText, Tag, FileText, CalendarClock, Printer, MessageSquareText, ListOrdered, AlertTriangle, Clock, Zap } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { getPedidos, getPedidoById, aplicarDescuento, quitarDescuento } from '../services/ordersService';
 import { getMetodosPago } from '../services/metodosPagoService';
@@ -335,6 +335,15 @@ export default function Caja() {
           <p className="text-xs text-gray-500 mt-0.5">Pedidos activos para cobrar</p>
         </div>
         <div className="flex flex-wrap gap-2 ml-auto">
+        {/* Venta de mostrador (entradas de piscina, ropa de baño…): sin mesa ni cocina. */}
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          onClick={() => navigate('/venta-rapida')}
+          className="flex items-center gap-1.5 px-3.5 py-2 bg-card rounded-full hover:bg-cardHighlight border border-gray-800/50 text-xs font-bold text-gray-300"
+        >
+          <Zap size={15} />
+          Venta rápida
+        </motion.button>
         {/* Todos los pedidos del día (también los cobrados y anulados), para consultar o reimprimir. */}
         <motion.button
           whileTap={{ scale: 0.95 }}

@@ -36,7 +36,8 @@ export default function JornadaGate() {
 
   if (!user || !cargada || RUTAS_SIN_AVISO.includes(location.pathname) || user.rol === 'COCINA') return null;
 
-  const puedeAbrir = user.rol === 'ADMIN' || user.rol === 'CAJERO';
+  const puedeAbrir = user.rol === 'ADMIN' || user.rol === 'CAJERO' || user.rol === 'TAQUILLA';
+  const esTaquilla = user.rol === 'TAQUILLA';
   const enPaginaJornada = location.pathname === '/jornada';
 
   const omitir = () => {
@@ -67,9 +68,11 @@ export default function JornadaGate() {
                   <div className="w-16 h-16 bg-primary/15 rounded-3xl flex items-center justify-center mb-3">
                     <Sun size={30} className="text-primary" />
                   </div>
-                  <h1 className="text-2xl font-extrabold tracking-tight">Abrir el día</h1>
+                  <h1 className="text-2xl font-extrabold tracking-tight">{esTaquilla ? 'Abrir la caja de la piscina' : 'Abrir el día'}</h1>
                   <p className="text-sm text-gray-400 mt-1">
-                    {nombreComercial ? `${nombreComercial}: ` : ''}para tomar pedidos y cobrar, primero abre la jornada con el fondo de caja.
+                    {esTaquilla
+                      ? 'Para vender, primero abre tu caja con el fondo de caja (el efectivo para dar vuelto).'
+                      : `${nombreComercial ? `${nombreComercial}: ` : ''}para tomar pedidos y cobrar, primero abre la jornada con el fondo de caja.`}
                   </p>
                 </div>
                 <AbrirJornadaForm
@@ -88,7 +91,9 @@ export default function JornadaGate() {
         <div className="sticky top-0 z-40 bg-yellow-950/90 border-b border-yellow-800/50 backdrop-blur px-4 py-2.5 flex items-center gap-3 text-sm">
           <CalendarClock size={18} className="text-accentYellow flex-shrink-0" />
           <p className="flex-1 text-yellow-100/90 text-xs sm:text-sm">
-            {puedeAbrir
+            {esTaquilla
+              ? 'Tu caja aún no se ha abierto: no se puede vender.'
+              : puedeAbrir
               ? 'El día aún no se ha abierto: no se pueden tomar pedidos ni cobrar.'
               : 'El día aún no se ha abierto. Avisa al administrador o a caja para empezar a tomar pedidos.'}
           </p>

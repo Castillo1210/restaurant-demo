@@ -32,6 +32,7 @@ public class ReimprimirComandaCommandHandler : IRequestHandler<ReimprimirComanda
             .Include(p => p.Usuario)
             .Include(p => p.DetallesPedidos)
                 .ThenInclude(d => d.Producto)
+                    .ThenInclude(pr => pr.Categoria)
             .FirstOrDefaultAsync(p => p.PedidoId == request.PedidoId, cancellationToken)
             ?? throw new KeyNotFoundException($"Pedido {request.PedidoId} no encontrado");
 
@@ -49,7 +50,7 @@ public class ReimprimirComandaCommandHandler : IRequestHandler<ReimprimirComanda
             EsReimpresion = true,
             Comentario = pedido.Comentario,
             Items = pedido.DetallesPedidos
-                .Where(d => d.EstadoDetallePedido != EstadoDetallePedido.Cancelado)
+                .Where(d => d.EstadoDetallePedido != EstadoDetallePedido.Cancelado && CaraNegra.Application.Ventas.Mostrador.VaACocina(d))
                 .Select(d => new ItemComanda
             {
                 ProductoNombre = d.Producto?.Nombre ?? string.Empty,

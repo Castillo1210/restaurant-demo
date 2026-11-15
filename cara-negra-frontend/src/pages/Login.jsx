@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import { useEmpresa } from '../context/EmpresaContext';
 import { getPantallaPin, getTokenDispositivo } from '../services/authService';
+import { rutaInicio } from '../utils/inicio';
 
 const LARGO_PIN = 4;
 
@@ -83,7 +84,7 @@ export default function Login() {
   };
 
   const irSegunRol = useCallback(
-    (auth) => navigate(auth?.rol === 'COCINA' ? '/cocina' : '/dashboard'),
+    (auth) => navigate(rutaInicio(auth?.rol)),
     [navigate]
   );
 

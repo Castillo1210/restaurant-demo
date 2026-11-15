@@ -1,4 +1,5 @@
 using CaraNegra.Application.Common.Interfaces;
+using CaraNegra.Application.Ventas;
 using CaraNegra.Domain.Entities;
 using CaraNegra.Domain.Enums;
 using MediatR;
@@ -8,7 +9,8 @@ namespace CaraNegra.Application.Jornadas;
 
 // ───────────── Abrir ─────────────
 
-public record AbrirJornadaCommand(AbrirJornadaDto Dto, int UsuarioId) : IRequest<JornadaDto>;
+public record AbrirJornadaCommand(AbrirJornadaDto Dto, int UsuarioId, CajaJornada Caja = CajaJornada.Restaurante)
+    : IRequest<JornadaDto>;
 
 public class AbrirJornadaCommandHandler : IRequestHandler<AbrirJornadaCommand, JornadaDto>
 {
@@ -19,14 +21,15 @@ public class AbrirJornadaCommandHandler : IRequestHandler<AbrirJornadaCommand, J
     public async Task<JornadaDto> Handle(AbrirJornadaCommand request, CancellationToken cancellationToken)
     {
         // El admin y el cajero pueden abrir el día al mismo tiempo: se serializa para que no
-        // queden dos jornadas abiertas.
+        // queden dos jornadas abiertas en la misma caja.
         await using var tx = await _context.IniciarTransaccionAsync(cancellationToken);
         await _context.BloquearAperturaJornadaAsync(cancellationToken);
 
-        var abierta = await JornadaReglas.ObtenerAbiertaAsync(_context, cancellationToken);
+        var abierta = await JornadaReglas.ObtenerAbiertaAsync(_context, request.Caja, cancellationToken);
         if (abierta is not null)
             throw new InvalidOperationException(
-                $"Ya hay una jornada abierta (del {abierta.FechaOperativa:dd/MM/yyyy}). Ciérrala antes de abrir otra.");
+                $"La caja {Mostrador.NombreCaja(request.Caja)} ya tiene una jornada abierta (del {abierta.FechaOperativa:dd/MM/yyyy}). " +
+                "Ciérrala antes de abrir otra.");
 
         var usuario = await _context.Usuarios.AsNoTracking()
             .FirstOrDefaultAsync(u => u.UsuarioId == request.UsuarioId, cancellationToken)
@@ -35,6 +38,7 @@ public class AbrirJornadaCommandHandler : IRequestHandler<AbrirJornadaCommand, J
         var jornada = new Jornada
         {
             FechaOperativa = (request.Dto.FechaOperativa ?? JornadaReglas.HoyLima()).Date,
+            Caja = request.Caja,
             Estado = EstadoJornada.Abierta,
             AbiertaEn = DateTime.UtcNow,
             AbiertaPorUsuarioId = usuario.UsuarioId,
@@ -52,7 +56,8 @@ public class AbrirJornadaCommandHandler : IRequestHandler<AbrirJornadaCommand, J
 
 // ───────────── Movimientos de caja ─────────────
 
-public record RegistrarMovimientoCommand(RegistrarMovimientoDto Dto, int UsuarioId) : IRequest<MovimientoCajaDto>;
+public record RegistrarMovimientoCommand(RegistrarMovimientoDto Dto, int UsuarioId, CajaJornada Caja = CajaJornada.Restaurante)
+    : IRequest<MovimientoCajaDto>;
 
 public class RegistrarMovimientoCommandHandler : IRequestHandler<RegistrarMovimientoCommand, MovimientoCajaDto>
 {
@@ -64,7 +69,7 @@ public class RegistrarMovimientoCommandHandler : IRequestHandler<RegistrarMovimi
     {
         await using var tx = await _context.IniciarTransaccionAsync(cancellationToken);
         await _context.BloquearJornadaAbiertaAsync(exclusivo: false, cancellationToken);
-        var jornada = await JornadaReglas.RequerirAbiertaAsync(_context, cancellationToken);
+        var jornada = await JornadaReglas.RequerirAbiertaAsync(_context, request.Caja, cancellationToken);
         var usuario = await _context.Usuarios.AsNoTracking()
             .FirstOrDefaultAsync(u => u.UsuarioId == request.UsuarioId, cancellationToken)
             ?? throw new KeyNotFoundException("Usuario no encontrado");
@@ -86,7 +91,8 @@ public class RegistrarMovimientoCommandHandler : IRequestHandler<RegistrarMovimi
     }
 }
 
-public record AnularMovimientoCommand(int MovimientoCajaId, int UsuarioId) : IRequest<MovimientoCajaDto>;
+/// <param name="SoloCaja">Si tiene valor, el movimiento debe ser de esa caja (el cajero y la taquilla solo anulan los suyos).</param>
+public record AnularMovimientoCommand(int MovimientoCajaId, int UsuarioId, CajaJornada? SoloCaja = null) : IRequest<MovimientoCajaDto>;
 
 public class AnularMovimientoCommandHandler : IRequestHandler<AnularMovimientoCommand, MovimientoCajaDto>
 {
@@ -103,6 +109,8 @@ public class AnularMovimientoCommandHandler : IRequestHandler<AnularMovimientoCo
             .FirstOrDefaultAsync(m => m.MovimientoCajaId == request.MovimientoCajaId, cancellationToken)
             ?? throw new KeyNotFoundException("Movimiento no encontrado");
 
+        if (request.SoloCaja is CajaJornada caja && movimiento.Jornada.Caja != caja)
+            throw new InvalidOperationException("Ese movimiento es de otra caja: no puedes anularlo.");
         if (movimiento.Jornada.Estado == EstadoJornada.Cerrada)
             throw new InvalidOperationException("La jornada ya está cerrada: sus movimientos no se pueden modificar");
         if (movimiento.EstaAnulado)
@@ -122,7 +130,8 @@ public class AnularMovimientoCommandHandler : IRequestHandler<AnularMovimientoCo
 
 // ───────────── Cerrar (con lo registrado, sin arqueo) ─────────────
 
-public record CerrarJornadaCommand(CerrarJornadaDto Dto, int UsuarioId) : IRequest<ResumenJornadaDto>;
+public record CerrarJornadaCommand(CerrarJornadaDto Dto, int UsuarioId, CajaJornada Caja = CajaJornada.Restaurante)
+    : IRequest<ResumenJornadaDto>;
 
 public class CerrarJornadaCommandHandler : IRequestHandler<CerrarJornadaCommand, ResumenJornadaDto>
 {
@@ -138,10 +147,10 @@ public class CerrarJornadaCommandHandler : IRequestHandler<CerrarJornadaCommand,
         await using var tx = await _context.IniciarTransaccionAsync(cancellationToken);
         await _context.BloquearJornadaAbiertaAsync(exclusivo: true, cancellationToken);
 
-        var jornada = await JornadaReglas.ObtenerAbiertaAsync(_context, cancellationToken)
+        var jornada = await JornadaReglas.ObtenerAbiertaAsync(_context, request.Caja, cancellationToken)
             ?? throw new InvalidOperationException("No hay una jornada abierta (quizá otro usuario acaba de cerrarla). Actualiza la pantalla.");
 
-        var abiertos = await PedidosAbiertos.ListarAsync(_context, cancellationToken);
+        var abiertos = await PedidosAbiertos.ListarAsync(_context, jornada, cancellationToken);
         if (abiertos.Count > 0)
         {
             var mesas = string.Join(", ", abiertos.Take(6).Select(p => string.IsNullOrEmpty(p.SalonNombre)

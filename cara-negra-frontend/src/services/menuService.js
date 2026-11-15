@@ -24,6 +24,8 @@ const mapProducto = (p) => ({
   price: p.precio,
   disponible: p.estaDisponible,
   tipo: p.tipo,
+  // Categoría de mostrador (piscina): no va a cocina y sale en "Venta rápida".
+  esMostrador: !!p.esMostrador,
   // Foto del plato (o null: se muestra un ícono en su lugar).
   image: urlImagenProducto(p.productoId, p.imagenVersion ?? 0),
 });

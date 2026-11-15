@@ -19,7 +19,8 @@ public static class SalonSeeder
         using var scope = rootServices.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
 
-        var mesasSinSalon = await context.Mesas.Where(m => m.SalonId == null).ToListAsync();
+        // La mesa interna de mostrador (Venta rápida) no tiene salón a propósito.
+        var mesasSinSalon = await context.Mesas.Where(m => m.SalonId == null && !m.EsMostrador).ToListAsync();
         if (mesasSinSalon.Count == 0)
             return;
 

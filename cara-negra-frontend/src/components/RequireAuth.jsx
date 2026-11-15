@@ -1,5 +1,6 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { rutaInicio } from '../utils/inicio';
 
 /**
  * Bloquea el acceso a rutas protegidas si no hay una sesión activa.
@@ -22,8 +23,8 @@ export default function RequireAuth({ children, roles }) {
   }
 
   if (roles && roles.length > 0 && !roles.includes(user.rol)) {
-    // Cocina no usa el mapa de mesas: su pantalla "de inicio" es el tablero de cocina.
-    return <Navigate to={user.rol === 'COCINA' ? '/cocina' : '/dashboard'} replace />;
+    // Cada rol vuelve a su pantalla de inicio (cocina: su tablero; taquilla: la venta rápida).
+    return <Navigate to={rutaInicio(user.rol)} replace />;
   }
 
   return children;

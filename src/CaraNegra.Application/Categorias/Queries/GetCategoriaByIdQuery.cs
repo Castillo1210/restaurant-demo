@@ -24,6 +24,7 @@ public class GetCategoriaByIdQueryHandler : IRequestHandler<GetCategoriaByIdQuer
             Nombre = categoria.Nombre,
             Descripcion = categoria.Descripcion,
             EstaActivo = categoria.EstaActivo,
+            EsMostrador = categoria.EsMostrador,
             CreadoEn = categoria.CreadoEn
         };
     }

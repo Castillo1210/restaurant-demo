@@ -21,6 +21,7 @@ public static class AdminBootstrapSeeder
     private const string RolMozo = "MOZO";
     private const string RolCajero = "CAJERO";
     private const string RolCocina = "COCINA";
+    private const string RolTaquilla = "TAQUILLA";
 
     public static async Task SeedDefaultAdminIfNoneExistsAsync(IServiceProvider rootServices, ILogger logger)
     {
@@ -35,6 +36,7 @@ public static class AdminBootstrapSeeder
         await EnsureRolAsync(context, RolMozo, "Mesero / toma de pedidos");
         await EnsureRolAsync(context, RolCajero, "Caja / cobros");
         await EnsureRolAsync(context, RolCocina, "Cocina / pantalla de preparación");
+        await EnsureRolAsync(context, RolTaquilla, "Taquilla de la piscina / venta rápida con caja propia");
 
         var yaExisteAdmin = await context.Usuarios.AnyAsync(u => u.RolId == rolAdmin.RolId);
         if (yaExisteAdmin)

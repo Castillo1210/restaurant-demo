@@ -149,6 +149,9 @@ namespace CaraNegra.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("longtext");
 
+                    b.Property<bool>("EsMostrador")
+                        .HasColumnType("tinyint(1)");
+
                     b.Property<bool>("EstaActivo")
                         .HasColumnType("tinyint(1)");
 
@@ -610,6 +613,9 @@ namespace CaraNegra.Infrastructure.Migrations
                     b.Property<DateTime?>("ActualizadoEn")
                         .HasColumnType("datetime(6)");
 
+                    b.Property<int>("Caja")
+                        .HasColumnType("int");
+
                     b.Property<int>("CantidadPedidos")
                         .HasColumnType("int");
 
@@ -732,6 +738,9 @@ namespace CaraNegra.Infrastructure.Migrations
 
                     b.Property<DateTime>("CreadoEn")
                         .HasColumnType("datetime(6)");
+
+                    b.Property<bool>("EsMostrador")
+                        .HasColumnType("tinyint(1)");
 
                     b.Property<int>("Estado")
                         .HasColumnType("int");

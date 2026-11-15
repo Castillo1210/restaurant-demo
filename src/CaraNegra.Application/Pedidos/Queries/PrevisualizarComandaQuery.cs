@@ -30,6 +30,7 @@ public class PrevisualizarComandaQueryHandler : IRequestHandler<PrevisualizarCom
             .Include(p => p.Usuario)
             .Include(p => p.DetallesPedidos)
                 .ThenInclude(d => d.Producto)
+                    .ThenInclude(pr => pr.Categoria)
             .FirstOrDefaultAsync(p => p.PedidoId == request.PedidoId, cancellationToken)
             ?? throw new KeyNotFoundException($"Pedido {request.PedidoId} no encontrado");
 
@@ -43,7 +44,7 @@ public class PrevisualizarComandaQueryHandler : IRequestHandler<PrevisualizarCom
             EsAdicional = false,
             Comentario = pedido.Comentario,
             Items = pedido.DetallesPedidos
-                .Where(d => d.EstadoDetallePedido != CaraNegra.Domain.Enums.EstadoDetallePedido.Cancelado)
+                .Where(d => d.EstadoDetallePedido != CaraNegra.Domain.Enums.EstadoDetallePedido.Cancelado && CaraNegra.Application.Ventas.Mostrador.VaACocina(d))
                 .Select(d => new ItemComanda
             {
                 ProductoNombre = d.Producto?.Nombre ?? string.Empty,

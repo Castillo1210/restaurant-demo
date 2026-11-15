@@ -85,11 +85,12 @@ export default function useEnviarPedido() {
         esAdicional,
         fecha: new Date().toISOString(),
         comentario: pedido.comentario || comentario || '',
-        items: cart.map((item) => ({ cantidad: item.quantity, nombre: item.name, notas: item.nota })),
+        // Los productos de mostrador (piscina, ropa de baño…) no van a cocina: no salen en la comanda.
+        items: cart.filter((item) => !item.esMostrador).map((item) => ({ cantidad: item.quantity, nombre: item.name, notas: item.nota })),
       };
 
       clearCart();
-      if (IMPRIMEN_SU_COMANDA.includes(user.rol)) {
+      if (IMPRIMEN_SU_COMANDA.includes(user.rol) && comandaCaja.items.length > 0) {
         // Como la boleta: sale en la ticketera de este equipo (sin ventana si Chrome tiene --kiosk-printing).
         imprimirComandaEnCaja({ ...comandaCaja, nombreComercial }).catch((e) => console.error('No se pudo imprimir la comanda:', e));
       }

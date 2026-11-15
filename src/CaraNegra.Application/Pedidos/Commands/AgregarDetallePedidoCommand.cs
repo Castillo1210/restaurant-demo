@@ -113,21 +113,26 @@ public class AgregarDetallePedidoCommandHandler : IRequestHandler<AgregarDetalle
             pedido.Comentario = ComentarioPedido.Normalizar(request.Comentario);
 
         var estadoPedidoAnterior = pedido.EstadoPedido;
-        if (pedido.EstadoPedido == EstadoPedido.Listo)
-        {
-            pedido.EstadoPedido = EstadoPedido.EnPreparacion;
-        }
 
         // Una consulta por producto distinto (sin Contains: ver notas de EF en .NET 10).
         var productos = new Dictionary<int, Producto>();
         foreach (var productoId in items.Select(i => i.ProductoId).Distinct())
         {
             var producto = await _context.Productos
+                .Include(p => p.Categoria)
                 .FirstOrDefaultAsync(p => p.ProductoId == productoId, cancellationToken)
                 ?? throw new KeyNotFoundException($"Producto {productoId} no encontrado");
             if (!producto.EstaDisponible)
                 throw new InvalidOperationException($"El producto {producto.Nombre} no está disponible");
             productos[productoId] = producto;
+        }
+
+        // Un pedido Listo vuelve a "En preparación" solo si lo agregado lo prepara cocina
+        // (agregar una entrada de piscina o un flotador no lo devuelve a cocina).
+        if (pedido.EstadoPedido == EstadoPedido.Listo
+            && items.Any(i => !CaraNegra.Application.Ventas.Mostrador.EsDeMostrador(productos[i.ProductoId])))
+        {
+            pedido.EstadoPedido = EstadoPedido.EnPreparacion;
         }
 
         var nuevos = new List<DetallePedido>();
@@ -142,7 +147,10 @@ public class AgregarDetallePedidoCommandHandler : IRequestHandler<AgregarDetalle
                 Cantidad = item.Cantidad,
                 Monto = producto.Precio,
                 Notas = NotaPlato.Normalizar(item.Notas),
-                EstadoDetallePedido = EstadoDetallePedido.Pendiente
+                // Un producto de mostrador se entrega en el momento: no pasa por cocina.
+                EstadoDetallePedido = CaraNegra.Application.Ventas.Mostrador.EsDeMostrador(producto)
+                    ? EstadoDetallePedido.Entregado
+                    : EstadoDetallePedido.Pendiente
             };
             // Precio distinto al de la carta: solo cajero / admin, y queda registrado.
             if (item.PrecioUnitario is decimal precioPedido)
@@ -231,7 +239,8 @@ public class AgregarDetallePedidoCommandHandler : IRequestHandler<AgregarDetalle
             EsAdicional = true,
             ParaCaja = request.ComandaEnCaja,
             Comentario = pedidoActualizado.Comentario,
-            Items = nuevos.Select(d => new ItemComanda
+            // Solo lo que cocina prepara; si no hay nada para cocina no se imprime.
+            Items = nuevos.Where(d => !CaraNegra.Application.Ventas.Mostrador.EsDeMostrador(productos[d.ProductoId])).Select(d => new ItemComanda
             {
                 ProductoNombre = productos[d.ProductoId].Nombre,
                 Cantidad = d.Cantidad,

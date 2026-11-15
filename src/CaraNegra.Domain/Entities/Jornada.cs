@@ -6,7 +6,8 @@ namespace CaraNegra.Domain.Entities;
 /// <summary>
 /// Jornada = día operativo del restaurante. Se abre al empezar (con el fondo de caja) y se cierra
 /// con el arqueo. NO depende del día calendario: si se atiende pasada la medianoche, esas ventas
-/// siguen siendo de la jornada abierta. Solo puede haber una jornada abierta a la vez.
+/// siguen siendo de la jornada abierta. Solo puede haber una jornada abierta a la vez POR CAJA
+/// (restaurante y piscina llevan cada una su propia jornada).
 ///
 /// Cada pedido y cada pago quedan vinculados a la jornada en la que se registraron. Al cerrar se
 /// guarda una "foto" de los totales y el arqueo, y la jornada queda de solo lectura.
@@ -17,6 +18,9 @@ public class Jornada : BaseEntity
 
     /// <summary>Día al que corresponde (solo fecha, hora de Lima).</summary>
     public DateTime FechaOperativa { get; set; }
+
+    /// <summary>Caja a la que pertenece (restaurante o piscina).</summary>
+    public CajaJornada Caja { get; set; } = CajaJornada.Restaurante;
 
     public EstadoJornada Estado { get; set; } = EstadoJornada.Abierta;
 
