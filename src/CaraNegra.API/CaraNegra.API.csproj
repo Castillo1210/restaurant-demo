@@ -30,6 +30,15 @@
     <PackageReference Include="Serilog.Enrichers.CorrelationId" Version="3.0.1" />
     <PackageReference Include="Serilog.Enrichers.Environment" Version="3.0.1" />
     <PackageReference Include="Serilog.Enrichers.Thread" Version="4.0.0" />
+    <!-- Comanda de cocina dibujada como imagen con letra TrueType (Impresion/ImpresoraCocinaService). -->
+    <PackageReference Include="SkiaSharp" Version="3.116.1" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="3.116.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Letra de la comanda (Carlito, licencia SIL OFL 1.1: ver Impresion/Fuentes/OFL-Carlito.txt). -->
+    <EmbeddedResource Include="Impresion\Fuentes\Carlito-Regular.ttf" LogicalName="Fuentes.Carlito-Regular.ttf" />
+    <EmbeddedResource Include="Impresion\Fuentes\Carlito-Bold.ttf" LogicalName="Fuentes.Carlito-Bold.ttf" />
   </ItemGroup>
 
   <ItemGroup>

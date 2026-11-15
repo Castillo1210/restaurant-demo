@@ -4,6 +4,7 @@ using CaraNegra.API.Hubs;
 using CaraNegra.Application.Common.Interfaces;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Options;
+using SkiaSharp;
 
 namespace CaraNegra.API.Impresion;
 
@@ -15,6 +16,10 @@ namespace CaraNegra.API.Impresion;
 /// tipo de ticket (ADICIONAL, ANULADO…) en doble alto, mozo y hora en una sola línea, y los
 /// productos seguidos, sin líneas en blanco entre ellos, en el tamaño configurado
 /// (ImpresoraCocina:TamanoProductos). Corte de papel al final (sin cortador se ignora).
+///
+/// El ticket se dibuja como IMAGEN con una letra TrueType (Carlito, la misma familia que Calibri)
+/// y se manda en modo raster (GS v 0): sale más fina y proporcional que la letra interna de la
+/// ticketera, que a doble tamaño se ve gruesa. Si no se puede dibujar, se imprime en modo texto.
 /// </summary>
 public class ImpresoraCocinaService : IImpresoraCocinaService
 {
@@ -55,7 +60,7 @@ public class ImpresoraCocinaService : IImpresoraCocinaService
         var turnoTomado = false;
         try
         {
-            var ticket = ConstruirTicket(comanda);
+            var ticket = ConstruirTicketParaImprimir(comanda);
 
             // Esperar el turno (otra comanda imprimiéndose), con un tope para no colgar la petición.
             turnoTomado = await _turno.WaitAsync(TimeSpan.FromMilliseconds(_options.TimeoutMs * 2), cancellationToken);
@@ -157,9 +162,15 @@ public class ImpresoraCocinaService : IImpresoraCocinaService
     /// </summary>
     private enum Tamano { Normal, Alto, Intermedio, Grande }
 
-    /// <summary>Una línea del ticket ya cortada al ancho que le corresponde según su tamaño.</summary>
+    /// <summary>
+    /// Una línea del ticket ya cortada al ancho que le corresponde según su tamaño.
+    /// InicioNegrita/LargoNegrita: un tramo de la línea en negrita (p. ej. solo el nombre del mozo).
+    /// LargoDerecha: los últimos caracteres van alineados a la derecha (la hora), en el modo imagen.
+    /// Producto: línea de un plato (o su nota); en el modo imagen usa la escala de TamanoProductos.
+    /// </summary>
     private sealed record Linea(string Texto, Tamano Tam = Tamano.Normal, bool Negrita = false,
-        bool Centrada = false, bool EspacioDespues = false);
+        bool Centrada = false, bool EspacioDespues = false, int InicioNegrita = 0, int LargoNegrita = 0,
+        int LargoDerecha = 0, bool Producto = false);
 
     /// <summary>Caracteres por línea en letra normal (80 mm: 42-48; 58 mm: 32).</summary>
     private int Columnas => Math.Clamp(_options.Columnas, 24, 64);
@@ -216,12 +227,16 @@ public class ImpresoraCocinaService : IImpresoraCocinaService
         var textoHora = $"{hora:dd/MM HH:mm}";
         var rotuloPersona = comanda.EsAnulacion ? "Anulo" : comanda.EsCambioComentario ? "Por" : "Mozo";
         var persona = $"{rotuloPersona}: {comanda.MozoNombre}";
+        // Solo el nombre va en negrita (no "Mozo:" ni la hora).
+        var inicioNombre = rotuloPersona.Length + 2;
         if (persona.Length + 1 + textoHora.Length <= columnas)
-            lineas.Add(new Linea(Columnas2(persona, textoHora, columnas), Tamano.Alto));
+            lineas.Add(new Linea(Columnas2(persona, textoHora, columnas), Tamano.Alto,
+                InicioNegrita: inicioNombre, LargoNegrita: persona.Length - inicioNombre, LargoDerecha: textoHora.Length));
         else
         {
-            foreach (var parte in Envolver(persona, columnas, new string(' ', rotuloPersona.Length + 2)))
-                lineas.Add(new Linea(parte, Tamano.Alto));
+            foreach (var parte in Envolver(persona, columnas, new string(' ', inicioNombre)))
+                lineas.Add(new Linea(parte, Tamano.Alto,
+                    InicioNegrita: inicioNombre, LargoNegrita: Math.Max(0, parte.Length - inicioNombre)));
             lineas.Add(new Linea(textoHora));
         }
         if (comanda.EsAnulacion && !string.IsNullOrWhiteSpace(comanda.Motivo))
@@ -250,16 +265,18 @@ public class ImpresoraCocinaService : IImpresoraCocinaService
         // cocina solo tiene que reconocer los platos → siempre letra normal.
         var tam = comanda.EsAnulacion ? Tamano.Normal : TamanoProductos;
         var ancho = AnchoDe(tam);
+        // En Intermedia (fuente B a doble tamaño) la negrita empasta la letra: va sin negrita.
+        var negrita = tam != Tamano.Intermedio;
         foreach (var item in comanda.Items)
         {
             var prefijo = $"{item.Cantidad} x ";
             foreach (var parte in Envolver(prefijo + item.ProductoNombre, ancho, new string(' ', prefijo.Length)))
-                lineas.Add(new Linea(parte, tam, Negrita: true));
+                lineas.Add(new Linea(parte, tam, Negrita: negrita, Producto: true));
 
             // La nota del plato ("sin cebolla") justo debajo, del mismo tamaño y marcada con ">>".
             if (!string.IsNullOrWhiteSpace(item.Notas))
                 foreach (var parte in Envolver($">> {item.Notas!.Trim()}", ancho, "   "))
-                    lineas.Add(new Linea(parte, tam, Negrita: true));
+                    lineas.Add(new Linea(parte, tam, Negrita: negrita, Producto: true));
         }
 
         lineas.Add(new Linea(separador));
@@ -288,7 +305,18 @@ public class ImpresoraCocinaService : IImpresoraCocinaService
                 Tamano.Alto => (byte)0x01,     // doble alto
                 _ => (byte)0x00
             } });
-            b.AddRange(Encoding.ASCII.GetBytes(NormalizarAscii(linea.Texto)));
+            if (linea.LargoNegrita > 0 && linea.InicioNegrita + linea.LargoNegrita <= linea.Texto.Length)
+            {
+                // Tramo en negrita dentro de la línea: ESC E 1 antes y ESC E 0 después.
+                var fin = linea.InicioNegrita + linea.LargoNegrita;
+                b.AddRange(Encoding.ASCII.GetBytes(NormalizarAscii(linea.Texto[..linea.InicioNegrita])));
+                b.AddRange(new byte[] { 0x1B, 0x45, 0x01 });
+                b.AddRange(Encoding.ASCII.GetBytes(NormalizarAscii(linea.Texto[linea.InicioNegrita..fin])));
+                b.AddRange(new byte[] { 0x1B, 0x45, (byte)(linea.Negrita ? 1 : 0) });
+                b.AddRange(Encoding.ASCII.GetBytes(NormalizarAscii(linea.Texto[fin..])));
+            }
+            else
+                b.AddRange(Encoding.ASCII.GetBytes(NormalizarAscii(linea.Texto)));
             b.Add(0x0A);
             if (linea.EspacioDespues)
             {
@@ -297,6 +325,188 @@ public class ImpresoraCocinaService : IImpresoraCocinaService
             }
         }
         b.AddRange(new byte[] { 0x1D, 0x21, 0x00, 0x1B, 0x45, 0x00, 0x1B, 0x61, 0x00, 0x1B, 0x4D, 0x00 }); // volver a normal
+        b.AddRange(new byte[] { 0x1B, 0x64, 0x04 });          // ESC d 4: avanzar 4 líneas
+        b.AddRange(new byte[] { 0x1D, 0x56, 0x42, 0x00 });    // GS V B 0: cortar (si tiene cortador)
+        return b.ToArray();
+    }
+
+    // ───────────── Ticket como imagen (letra TrueType) ─────────────
+
+    /// <summary>Primero como imagen; si falla (librería gráfica o letra), en modo texto: la comanda siempre sale.</summary>
+    private byte[] ConstruirTicketParaImprimir(ComandaCocina comanda)
+    {
+        try
+        {
+            return ConstruirTicketImagen(comanda);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "No se pudo dibujar la comanda del pedido {PedidoId} como imagen; se imprime en modo texto.",
+                comanda.PedidoId);
+            return ConstruirTicket(comanda);
+        }
+    }
+
+    /// <summary>Ancho imprimible en puntos (203 ppp): 80 mm → 576; 58 mm → 384.</summary>
+    private int AnchoPuntos => Columnas >= 42 ? 576 : 384;
+
+    private const int MargenPuntos = 4;
+
+    /// <summary>
+    /// Alto de la letra en puntos (modo imagen). Los platos siguen ImpresoraCocina:TamanoProductos
+    /// en orden Grande &gt; Intermedia &gt; Mediana (Alto) &gt; Pequeña (Normal); el encabezado
+    /// (mesa, mozo, avisos) tiene su propio tamaño fijo.
+    /// </summary>
+    private static float PuntosDe(Linea linea) => linea.Producto
+        ? linea.Tam switch
+        {
+            Tamano.Grande => 38f,
+            Tamano.Intermedio => 30f,
+            Tamano.Alto => 26f,
+            _ => 22f
+        }
+        : linea.Tam switch
+        {
+            Tamano.Grande => 38f,
+            Tamano.Alto or Tamano.Intermedio => 32f,
+            _ => 24f
+        };
+
+    private static readonly Lazy<SKTypeface> FuenteNormal = new(() => CargarFuente("Fuentes.Carlito-Regular.ttf"));
+    private static readonly Lazy<SKTypeface> FuenteNegrita = new(() => CargarFuente("Fuentes.Carlito-Bold.ttf"));
+
+    private static SKTypeface CargarFuente(string recurso)
+    {
+        using var stream = typeof(ImpresoraCocinaService).Assembly.GetManifestResourceStream(recurso)
+            ?? throw new InvalidOperationException($"No está la letra {recurso} dentro del programa.");
+        using var copia = new MemoryStream();
+        stream.CopyTo(copia);
+        return SKTypeface.FromData(SKData.CreateCopy(copia.ToArray()))
+            ?? throw new InvalidOperationException($"No se pudo leer la letra {recurso}.");
+    }
+
+    private static bool EsSeparador(Linea linea) => linea.Texto.Length > 0 && linea.Texto.All(c => c == '=');
+
+    /// <summary>La línea en tramos (normal / negrita) y, aparte, el texto alineado a la derecha.</summary>
+    private static (List<(string Texto, bool Negrita)> Tramos, string? Derecha) Partir(Linea linea)
+    {
+        var texto = linea.Texto;
+        string? derecha = null;
+        if (linea.LargoDerecha > 0 && linea.LargoDerecha < texto.Length)
+        {
+            derecha = texto[^linea.LargoDerecha..];
+            texto = texto[..^linea.LargoDerecha].TrimEnd();
+        }
+
+        var tramos = new List<(string Texto, bool Negrita)>();
+        if (linea.LargoNegrita > 0 && linea.InicioNegrita + linea.LargoNegrita <= texto.Length)
+        {
+            var fin = linea.InicioNegrita + linea.LargoNegrita;
+            tramos.Add((texto[..linea.InicioNegrita], linea.Negrita));
+            tramos.Add((texto[linea.InicioNegrita..fin], true));
+            tramos.Add((texto[fin..], linea.Negrita));
+        }
+        else
+            tramos.Add((texto, linea.Negrita));
+        return (tramos, derecha);
+    }
+
+    private static float AnchoTramos(List<(string Texto, bool Negrita)> tramos, SKFont normal, SKFont negrita) =>
+        tramos.Sum(t => (t.Negrita ? negrita : normal).MeasureText(t.Texto));
+
+    private byte[] ConstruirTicketImagen(ComandaCocina comanda)
+    {
+        var ancho = AnchoPuntos;
+        var util = ancho - 2 * MargenPuntos;
+
+        // 1) Medir: cada línea con su tamaño de letra, reducido si no entra a lo ancho.
+        var plan = new List<(Linea Linea, float Letra, float Alto)>();
+        float altoTotal = 0;
+        foreach (var linea in ArmarComanda(comanda))
+        {
+            float letra = 0, alto;
+            if (EsSeparador(linea))
+                alto = 14;
+            else
+            {
+                letra = PuntosDe(linea);
+                using var normal = new SKFont(FuenteNormal.Value, letra);
+                using var negrita = new SKFont(FuenteNegrita.Value, letra);
+                var (tramos, derecha) = Partir(linea);
+                var anchoTexto = AnchoTramos(tramos, normal, negrita);
+                if (derecha is not null)
+                    anchoTexto += (linea.Negrita ? negrita : normal).MeasureText("  " + derecha);
+                if (anchoTexto > util)
+                    letra *= util / anchoTexto;
+                alto = letra * 1.2f;
+            }
+            if (linea.EspacioDespues) alto += 10;
+            plan.Add((linea, letra, alto));
+            altoTotal += alto;
+        }
+        var altoPuntos = (int)Math.Ceiling(altoTotal) + 4;
+
+        // 2) Dibujar.
+        using var bitmap = new SKBitmap(new SKImageInfo(ancho, altoPuntos, SKColorType.Rgba8888, SKAlphaType.Premul));
+        using (var canvas = new SKCanvas(bitmap))
+        using (var tinta = new SKPaint { Color = SKColors.Black, IsAntialias = true })
+        {
+            canvas.Clear(SKColors.White);
+            float y = 0;
+            foreach (var (linea, letra, alto) in plan)
+            {
+                if (EsSeparador(linea))
+                    canvas.DrawRect(MargenPuntos, y + 6, util, 2, tinta);
+                else
+                {
+                    using var normal = new SKFont(FuenteNormal.Value, letra) { Edging = SKFontEdging.Antialias };
+                    using var negrita = new SKFont(FuenteNegrita.Value, letra) { Edging = SKFontEdging.Antialias };
+                    var (tramos, derecha) = Partir(linea);
+                    var baseY = y + letra * 0.9f;
+                    var x = linea.Centrada
+                        ? MargenPuntos + Math.Max(0, (util - AnchoTramos(tramos, normal, negrita)) / 2)
+                        : MargenPuntos;
+                    foreach (var (texto, esNegrita) in tramos)
+                    {
+                        if (texto.Length == 0) continue;
+                        var fuente = esNegrita ? negrita : normal;
+                        canvas.DrawText(texto, x, baseY, fuente, tinta);
+                        x += fuente.MeasureText(texto);
+                    }
+                    if (derecha is not null)
+                    {
+                        var fuente = linea.Negrita ? negrita : normal;
+                        canvas.DrawText(derecha, MargenPuntos + util - fuente.MeasureText(derecha), baseY, fuente, tinta);
+                    }
+                }
+                y += alto;
+            }
+        }
+
+        // 3) A blanco y negro, 1 bit por punto (el bit más alto es el punto de la izquierda).
+        var bytesPorFila = ancho / 8;
+        var datos = new byte[bytesPorFila * altoPuntos];
+        var pixeles = bitmap.GetPixelSpan();
+        var bytesFilaBitmap = bitmap.RowBytes;
+        for (var fila = 0; fila < altoPuntos; fila++)
+            for (var col = 0; col < ancho; col++)
+                if (pixeles[fila * bytesFilaBitmap + col * 4] < 128)   // canal rojo: el texto es gris
+                    datos[fila * bytesPorFila + (col >> 3)] |= (byte)(0x80 >> (col & 7));
+
+        // 4) ESC/POS: GS v 0 por bloques (algunas ticketeras tienen poco búfer), avance y corte.
+        var b = new List<byte>(datos.Length + 256) { 0x1B, 0x40 };   // ESC @: inicializar
+        const int filasPorBloque = 128;
+        for (var inicio = 0; inicio < altoPuntos; inicio += filasPorBloque)
+        {
+            var filas = Math.Min(filasPorBloque, altoPuntos - inicio);
+            b.AddRange(new byte[]
+            {
+                0x1D, 0x76, 0x30, 0x00,
+                (byte)(bytesPorFila & 0xFF), (byte)(bytesPorFila >> 8),
+                (byte)(filas & 0xFF), (byte)(filas >> 8)
+            });
+            b.AddRange(new ArraySegment<byte>(datos, inicio * bytesPorFila, filas * bytesPorFila));
+        }
         b.AddRange(new byte[] { 0x1B, 0x64, 0x04 });          // ESC d 4: avanzar 4 líneas
         b.AddRange(new byte[] { 0x1D, 0x56, 0x42, 0x00 });    // GS V B 0: cortar (si tiene cortador)
         return b.ToArray();

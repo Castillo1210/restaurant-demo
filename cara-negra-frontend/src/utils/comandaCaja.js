@@ -30,7 +30,7 @@ export function imprimirComandaEnCaja(datos) {
     ${datos.esAdicional ? '<div class="tc-adicional">** ADICIONAL **</div>' : ''}
     <div class="tc-mesa">${escapar(etiquetaMesa(datos.salonNombre, datos.mesaNumero).toUpperCase())}</div>
     ${salonTieneNombreCompuesto(datos.salonNombre) ? `<div class="tc-centro">(${escapar(datos.salonNombre)})</div>` : ''}
-    <div class="tc-fila"><span>${datos.atendidoPor ? `Mozo: ${escapar(datos.atendidoPor)}` : ''}</span><span>${escapar(horaLima(datos.fecha))}</span></div>
+    <div class="tc-fila"><span>${datos.atendidoPor ? `Mozo: <b>${escapar(datos.atendidoPor)}</b>` : ''}</span><span>${escapar(horaLima(datos.fecha))}</span></div>
     <div class="tc-sep"></div>
     ${datos.comentario && String(datos.comentario).trim()
       ? `<div class="tc-comentario">NOTA: ${escapar(String(datos.comentario).trim())}</div><div class="tc-sep"></div>`
@@ -60,7 +60,7 @@ export function imprimirAnulacionEnCaja(datos) {
   el.innerHTML = `
     <div class="tc-adicional">${datos.pedidoCompleto ? '** PEDIDO ANULADO **' : '** ANULADO **'}</div>
     <div class="tc-mesa">${escapar(etiquetaMesa(datos.salonNombre, datos.mesaNumero).toUpperCase())}</div>
-    <div class="tc-fila"><span>${datos.anulo ? `Anuló: ${escapar(datos.anulo)}` : ''}</span><span>${escapar(horaLima(datos.fecha))}</span></div>
+    <div class="tc-fila"><span>${datos.anulo ? `Anuló: <b>${escapar(datos.anulo)}</b>` : ''}</span><span>${escapar(horaLima(datos.fecha))}</span></div>
     ${datos.motivo ? `<div class="tc-comentario">Motivo: ${escapar(datos.motivo)}</div>` : ''}
     <div class="tc-sep"></div>
     ${items.map((i) => `

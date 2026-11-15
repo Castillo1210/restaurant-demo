@@ -111,16 +111,22 @@
   #zona-impresion .ticket-comanda .tc-fila {
     display: flex;
     justify-content: space-between;
+    font-weight: 400;
+  }
+  #zona-impresion .ticket-comanda .tc-fila b {
+    font-weight: 800;
   }
   #zona-impresion .ticket-comanda .tc-sep {
     border-top: 2px dashed #000;
     margin: 1.5mm 0;
   }
+  /* Platos en letra regular, como la comanda de cocina (Arial con 600 ya sale en negrita);
+     solo el nombre del mozo va en negrita. */
   #zona-impresion .ticket-comanda .tc-item {
     display: flex;
     gap: 1.5mm;
-    font-size: 15px;
-    font-weight: 800;
+    font-size: 14px;
+    font-weight: 400;
     line-height: 1.2;
     margin-top: 0.6mm; /* productos seguidos: ahorra papel */
   }
@@ -173,7 +179,7 @@
   }
   #zona-impresion .ticket-comanda .tc-nota {
     font-size: 13px;
-    font-weight: 800;
+    font-weight: 400;
     margin-left: 11mm;
   }
 }
