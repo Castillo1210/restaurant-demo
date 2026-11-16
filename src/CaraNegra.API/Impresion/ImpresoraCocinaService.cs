@@ -41,10 +41,6 @@ public class ImpresoraCocinaService : IImpresoraCocinaService
 
     public async Task<ResultadoImpresion> ImprimirComandaAsync(ComandaCocina comanda, CancellationToken cancellationToken = default)
     {
-        // Nada para cocina (p. ej. solo productos de mostrador: entradas, flotadores…): no se imprime.
-        if (comanda.Items.Count == 0 && !comanda.EsCambioComentario)
-            return ResultadoImpresion.Impresa;
-
         // Pedido del administrador o del cajero: la comanda la imprime su propio equipo en su
         // ticketera, igual que la boleta. Aquí no se manda nada a la ticketera de cocina.
         if (comanda.ParaCaja)
@@ -376,7 +372,7 @@ public class ImpresoraCocinaService : IImpresoraCocinaService
     private static float PuntosDe(Linea linea) => linea.Producto
         ? linea.Tam switch
         {
-            Tamano.Grande => 34f,
+            Tamano.Grande => 33f,
             Tamano.Intermedio => 30f,
             Tamano.Alto => 26f,
             _ => 22f
