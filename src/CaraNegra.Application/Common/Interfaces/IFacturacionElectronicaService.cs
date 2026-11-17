@@ -28,6 +28,42 @@ public interface IFacturacionElectronicaService
     Task<RespuestaFacturacion> EnviarAsync(SolicitudComprobante solicitud, CancellationToken cancellationToken = default);
 
     Task<RespuestaFacturacion> ConsultarEstadoAsync(TipoComprobante tipo, string serie, int numero, CancellationToken cancellationToken = default);
+
+    // ── Anulaciones y notas de crédito ──
+
+    /// <summary>Serie de las notas de crédito que afectan a ese tipo de comprobante (FC01 / BC01).</summary>
+    string SerieNotaCredito(TipoComprobante afectado);
+
+    /// <summary>
+    /// Anula dentro del plazo: factura → comunicación de baja (POST /voided);
+    /// boleta → resumen diario con acción "anular" (POST /daily-summary).
+    /// </summary>
+    Task<RespuestaFacturacion> AnularAsync(SolicitudAnulacion solicitud, CancellationToken cancellationToken = default);
+
+    /// <summary>Emite una nota de crédito (la solicitud lleva <see cref="SolicitudComprobante.NotaCredito"/>).</summary>
+    Task<RespuestaFacturacion> EmitirNotaCreditoAsync(SolicitudComprobante solicitud, CancellationToken cancellationToken = default);
+
+    Task<RespuestaFacturacion> ConsultarNotaCreditoAsync(string serie, int numero, CancellationToken cancellationToken = default);
+}
+
+/// <summary>Comunicación de baja (factura) o anulación en resumen diario (boleta).</summary>
+public class SolicitudAnulacion
+{
+    public TipoComprobante Tipo { get; set; }
+    public string Serie { get; set; } = string.Empty;
+    public int Numero { get; set; }
+    public string Motivo { get; set; } = string.Empty;
+}
+
+/// <summary>Datos propios de una nota de crédito.</summary>
+public class DatosNotaCredito
+{
+    /// <summary>Catálogo 09: "01" anulación de la operación, "03" corrección por error en la descripción.</summary>
+    public string Codigo { get; set; } = "01";
+    public string Motivo { get; set; } = string.Empty;
+    public TipoComprobante AfectadoTipo { get; set; }
+    public string AfectadoSerie { get; set; } = string.Empty;
+    public int AfectadoNumero { get; set; }
 }
 
 /// <summary>Datos del comprobante que se envían al proveedor (independiente del formato del PSE).</summary>
@@ -51,6 +87,9 @@ public class SolicitudComprobante
     public decimal Total { get; set; }
 
     public List<ItemSolicitud> Items { get; set; } = new();
+
+    /// <summary>Si no es null, se emite una NOTA DE CRÉDITO (Serie/Numero son los de la nota).</summary>
+    public DatosNotaCredito? NotaCredito { get; set; }
 }
 
 public class ItemSolicitud
@@ -77,7 +116,9 @@ public enum ResultadoFacturacion
     /// <summary>Consulta de estado: el proveedor no tiene ese comprobante.</summary>
     NoEncontrado,
     /// <summary>No hubo respuesta clara (sin internet, timeout, 5xx, token inválido…). Se puede reintentar.</summary>
-    SinConexion
+    SinConexion,
+    /// <summary>Consulta de estado: el comprobante figura anulado / dado de baja.</summary>
+    Anulado
 }
 
 public class RespuestaFacturacion

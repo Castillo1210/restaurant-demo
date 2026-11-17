@@ -46,16 +46,19 @@ public static class ApiSunatPayload
         }
 
         var (tipoDoc, numeroDoc, denominacion) = Cliente(s);
+        var nota = s.NotaCredito;
+        var total = TotalLineas(items, valores, descuentos, factor);
 
         return new ApiSunatDocumento
         {
-            Documento = s.Tipo == TipoComprobante.Factura ? "factura" : "boleta",
+            Documento = nota != null ? "nota_credito" : s.Tipo == TipoComprobante.Factura ? "factura" : "boleta",
             Serie = s.Serie,
             Numero = s.Numero,
             FechaDeEmision = s.FechaEmisionLocal.ToString("yyyy-MM-dd", Inv),
             HoraDeEmision = s.FechaEmisionLocal.ToString("HH:mm:ss", Inv),
             Moneda = "PEN",
-            TipoOperacion = "0101",
+            // La nota de crédito no lleva tipo de operación (es de la factura / boleta).
+            TipoOperacion = nota != null ? null : "0101",
             ClienteTipoDeDocumento = tipoDoc,
             ClienteNumeroDeDocumento = numeroDoc,
             ClienteDenominacion = denominacion,
@@ -73,7 +76,19 @@ public static class ApiSunatPayload
                     ? [new ApiSunatDescuento { Monto = descuentos[k].ToString("0.00", Inv), Codigo = "00" }]
                     : null
             }).ToList(),
-            Total = TotalLineas(items, valores, descuentos, factor).ToString("0.00", Inv)
+            Total = total.ToString("0.00", Inv),
+            // Nota de corrección (importes en cero): APISUNAT pide también total_igv en cero.
+            TotalIgv = nota != null && total == 0 ? "0.00" : null,
+            NotaCreditoCodigoTipo = nota?.Codigo,
+            NotaCreditoMotivo = nota?.Motivo,
+            DocumentoAfectado = nota == null
+                ? null
+                : new ApiSunatDocumentoAfectado
+                {
+                    Documento = nota.AfectadoTipo == TipoComprobante.Factura ? "factura" : "boleta",
+                    Serie = nota.AfectadoSerie,
+                    Numero = nota.AfectadoNumero
+                }
         };
     }
 
@@ -167,13 +182,39 @@ public class ApiSunatDocumento
     [JsonPropertyName("fecha_de_emision")] public string FechaDeEmision { get; set; } = string.Empty;
     [JsonPropertyName("hora_de_emision")] public string HoraDeEmision { get; set; } = string.Empty;
     [JsonPropertyName("moneda")] public string Moneda { get; set; } = "PEN";
-    [JsonPropertyName("tipo_operacion")] public string TipoOperacion { get; set; } = "0101";
+    [JsonPropertyName("tipo_operacion")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? TipoOperacion { get; set; } = "0101";
     [JsonPropertyName("cliente_tipo_de_documento")] public string ClienteTipoDeDocumento { get; set; } = "1";
     [JsonPropertyName("cliente_numero_de_documento")] public string ClienteNumeroDeDocumento { get; set; } = string.Empty;
     [JsonPropertyName("cliente_denominacion")] public string ClienteDenominacion { get; set; } = string.Empty;
     [JsonPropertyName("cliente_direccion")] public string ClienteDireccion { get; set; } = "-";
     [JsonPropertyName("items")] public List<ApiSunatItem> Items { get; set; } = new();
     [JsonPropertyName("total")] public string Total { get; set; } = "0.00";
+
+    // ── Solo nota de crédito ──
+    [JsonPropertyName("total_igv")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? TotalIgv { get; set; }
+
+    [JsonPropertyName("nota_credito_codigo_tipo")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? NotaCreditoCodigoTipo { get; set; }
+
+    [JsonPropertyName("nota_credito_motivo")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? NotaCreditoMotivo { get; set; }
+
+    [JsonPropertyName("documento_afectado")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public ApiSunatDocumentoAfectado? DocumentoAfectado { get; set; }
+}
+
+public class ApiSunatDocumentoAfectado
+{
+    [JsonPropertyName("documento")] public string Documento { get; set; } = "factura";
+    [JsonPropertyName("serie")] public string Serie { get; set; } = string.Empty;
+    [JsonPropertyName("numero")] public int Numero { get; set; }
 }
 
 public class ApiSunatItem

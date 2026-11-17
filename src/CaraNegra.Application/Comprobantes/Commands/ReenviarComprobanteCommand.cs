@@ -124,6 +124,55 @@ public class ProcesarComprobantesPendientesCommandHandler : IRequestHandler<Proc
             procesados++;
         }
 
+        // Anulaciones en curso (baja / resumen / nota de crédito de anulación).
+        var anulaciones = await _context.Comprobantes
+            .Where(c => (c.AnulacionEstado == EstadoAnulacion.PorEnviar || c.AnulacionEstado == EstadoAnulacion.Pendiente)
+                && c.Ambiente == ambiente
+                && c.AnulacionSolicitadaEn > desde
+                && (c.AnulacionUltimoEnvioEn == null
+                    || (c.AnulacionIntentos < IntentosRapidos && c.AnulacionUltimoEnvioEn < limite)
+                    || c.AnulacionUltimoEnvioEn < limiteLento))
+            .OrderBy(c => c.AnulacionSolicitadaEn)
+            .Select(c => c.ComprobanteId)
+            .Take(Math.Clamp(request.Maximo, 1, 100))
+            .ToListAsync(cancellationToken);
+
+        foreach (var id in anulaciones)
+        {
+            var c = await ComprobanteQueries.ConDetalle(_context)
+                .FirstOrDefaultAsync(x => x.ComprobanteId == id, cancellationToken);
+            if (c is null) continue;
+            await AnulacionPendiente.ProcesarAsync(_context, _facturacion, c, cancellationToken);
+            procesados++;
+        }
+
+        // Notas de crédito sueltas (corrección de descripción) sin confirmar. Las de anulación ya
+        // se procesaron arriba junto con su comprobante.
+        var notas = await _context.NotasCredito
+            .Where(n => (n.Estado == EstadoComprobante.PorEnviar || n.Estado == EstadoComprobante.Pendiente)
+                && n.Codigo != ComprobanteAnulacion.CodigoAnulacionOperacion
+                && n.Ambiente == ambiente
+                && n.FechaEmision > desde
+                && (n.UltimoEnvioEn == null
+                    || (n.IntentosEnvio < IntentosRapidos && n.UltimoEnvioEn < limite)
+                    || n.UltimoEnvioEn < limiteLento))
+            .OrderBy(n => n.FechaEmision)
+            .Select(n => new { n.NotaCreditoId, n.ComprobanteId })
+            .Take(Math.Clamp(request.Maximo, 1, 100))
+            .ToListAsync(cancellationToken);
+
+        foreach (var n in notas)
+        {
+            var c = await ComprobanteQueries.ConDetalle(_context)
+                .FirstOrDefaultAsync(x => x.ComprobanteId == n.ComprobanteId, cancellationToken);
+            var nota = c?.NotasCredito.FirstOrDefault(x => x.NotaCreditoId == n.NotaCreditoId);
+            if (c is null || nota is null) continue;
+            await NotaCreditoEnvio.ProcesarAsync(nota, c, _facturacion, cancellationToken,
+                async ct => await _context.SaveChangesAsync(ct));
+            await _context.SaveChangesAsync(cancellationToken);
+            procesados++;
+        }
+
         return procesados;
     }
 }

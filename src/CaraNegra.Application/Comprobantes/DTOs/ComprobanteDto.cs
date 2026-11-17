@@ -50,6 +50,57 @@ public class ComprobanteDto
     public EmisorDto Emisor { get; set; } = new();
     public List<ComprobanteItemDto> Items { get; set; } = new();
     public List<ComprobantePagoDto> Pagos { get; set; } = new();
+
+    // ── Anulación ──
+    public EstadoAnulacion? AnulacionEstado { get; set; }
+    /// <summary>BAJA, RESUMEN o NOTA_CREDITO.</summary>
+    public string? AnulacionMetodo { get; set; }
+    public string? AnulacionMotivo { get; set; }
+    public string? AnulacionMensaje { get; set; }
+    public DateTime? AnulacionSolicitadaEn { get; set; }
+
+    /// <summary>Días calendario desde la emisión (0 = hoy).</summary>
+    public int DiasDesdeEmision { get; set; }
+    /// <summary>Cómo se anularía hoy (BAJA / RESUMEN / NOTA_CREDITO); null si ahora no se puede anular.</summary>
+    public string? MetodoAnulacionDisponible { get; set; }
+    /// <summary>Se puede emitir una nota de crédito de corrección de descripción.</summary>
+    public bool PuedeCorregir { get; set; }
+
+    public List<NotaCreditoDto> NotasCredito { get; set; } = new();
+}
+
+public class NotaCreditoDto
+{
+    public int NotaCreditoId { get; set; }
+    public string Numero { get; set; } = string.Empty;
+    public string Codigo { get; set; } = string.Empty;
+    public string TipoDescripcion { get; set; } = string.Empty;
+    public string Motivo { get; set; } = string.Empty;
+    public List<string> Correcciones { get; set; } = new();
+    public decimal Total { get; set; }
+    public DateTime FechaEmision { get; set; }
+    public EstadoComprobante Estado { get; set; }
+    public string Ambiente { get; set; } = "SIMULADO";
+    public string? MensajeSunat { get; set; }
+    public string? PdfUrl { get; set; }
+    public string? XmlUrl { get; set; }
+    public string? CdrUrl { get; set; }
+    public string EmitidoPor { get; set; } = string.Empty;
+}
+
+/// <summary>Body de POST /comprobantes/{id}/anular.</summary>
+public class AnularComprobanteDto
+{
+    public string? Motivo { get; set; }
+    /// <summary>true = anular con nota de crédito aunque esté dentro del plazo de baja / resumen.</summary>
+    public bool UsarNotaCredito { get; set; }
+}
+
+/// <summary>Body de POST /comprobantes/{id}/notas-credito (corrección de descripción).</summary>
+public class EmitirNotaCorreccionDto
+{
+    public string? Motivo { get; set; }
+    public List<string>? Correcciones { get; set; }
 }
 
 public class EmisorDto

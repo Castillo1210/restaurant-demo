@@ -24,6 +24,7 @@ public interface IApplicationDbContext
     DbSet<MovimientoArticulo> MovimientosArticulo { get; }
     DbSet<Crema> Cremas { get; }
     DbSet<Comprobante> Comprobantes { get; }
+    DbSet<NotaCredito> NotasCredito { get; }
     DbSet<Cliente> Clientes { get; }
     DbSet<ConfiguracionEmpresa> ConfiguracionesEmpresa { get; }
     DbSet<DispositivoAutorizado> DispositivosAutorizados { get; }

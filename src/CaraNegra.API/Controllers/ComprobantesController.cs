@@ -118,4 +118,41 @@ public class ComprobantesController : ControllerBase
     {
         return Ok(await _mediator.Send(new ReenviarComprobanteCommand(id)));
     }
+
+    private int UsuarioId => int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+
+    // ───────────── Anulación y notas de crédito (solo ADMIN) ─────────────
+
+    /// <summary>
+    /// Anula el comprobante ante SUNAT: factura hasta 3 días → comunicación de baja; boleta hasta
+    /// 5 días → resumen diario; fuera de plazo (o con usarNotaCredito) → nota de crédito 01.
+    /// </summary>
+    [HttpPost("{id}/anular")]
+    [Authorize(Roles = "ADMIN")]
+    public async Task<IActionResult> Anular(int id, [FromBody] AnularComprobanteDto dto) =>
+        Ok(await _mediator.Send(new AnularComprobanteCommand(id, dto?.Motivo, dto?.UsarNotaCredito ?? false, UsuarioId)));
+
+    /// <summary>Reenvía o consulta una anulación en proceso.</summary>
+    [HttpPost("{id}/anulacion/reintentar")]
+    [Authorize(Roles = "ADMIN")]
+    public async Task<IActionResult> ReintentarAnulacion(int id) =>
+        Ok(await _mediator.Send(new ReintentarAnulacionCommand(id)));
+
+    /// <summary>Marca como aceptada una baja / resumen pendiente ya verificada en el panel de APISUNAT.</summary>
+    [HttpPost("{id}/anulacion/confirmar")]
+    [Authorize(Roles = "ADMIN")]
+    public async Task<IActionResult> ConfirmarAnulacion(int id) =>
+        Ok(await _mediator.Send(new ConfirmarAnulacionCommand(id, UsuarioId)));
+
+    /// <summary>Nota de crédito 03: corrección por error en la descripción (importes en cero).</summary>
+    [HttpPost("{id}/notas-credito")]
+    [Authorize(Roles = "ADMIN")]
+    public async Task<IActionResult> EmitirNotaCorreccion(int id, [FromBody] EmitirNotaCorreccionDto dto) =>
+        Ok(await _mediator.Send(new EmitirNotaCorreccionCommand(id, dto?.Motivo, dto?.Correcciones, UsuarioId)));
+
+    /// <summary>Reenvía o consulta una nota de crédito sin confirmar o con error de envío.</summary>
+    [HttpPost("notas-credito/{notaId}/reenviar")]
+    [Authorize(Roles = "ADMIN")]
+    public async Task<IActionResult> ReenviarNotaCredito(int notaId) =>
+        Ok(await _mediator.Send(new ReenviarNotaCreditoCommand(notaId)));
 }

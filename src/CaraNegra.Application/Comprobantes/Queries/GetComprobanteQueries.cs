@@ -84,6 +84,9 @@ public class ComprobanteResumenDto
     public DateTime FechaEmision { get; set; }
     public EstadoComprobante Estado { get; set; }
     public string? MensajeSunat { get; set; }
+    public EstadoAnulacion? AnulacionEstado { get; set; }
+    public string? AnulacionMetodo { get; set; }
+    public int NotasCredito { get; set; }
 }
 
 public class GetAllComprobantesQueryHandler : IRequestHandler<GetAllComprobantesQuery, ComprobantesListadoDto>
@@ -119,7 +122,10 @@ public class GetAllComprobantesQueryHandler : IRequestHandler<GetAllComprobantes
                 c.Total,
                 c.FechaEmision,
                 c.Estado,
-                c.MensajeSunat
+                c.MensajeSunat,
+                c.AnulacionEstado,
+                c.AnulacionMetodo,
+                NotasCredito = c.NotasCredito.Count()
             })
             .ToListAsync(cancellationToken);
 
@@ -136,7 +142,10 @@ public class GetAllComprobantesQueryHandler : IRequestHandler<GetAllComprobantes
             Total = c.Total,
             FechaEmision = c.FechaEmision,
             Estado = c.Estado,
-            MensajeSunat = c.MensajeSunat
+            MensajeSunat = c.MensajeSunat,
+            AnulacionEstado = c.AnulacionEstado,
+            AnulacionMetodo = c.AnulacionMetodo,
+            NotasCredito = c.NotasCredito
         }).ToList();
 
         // Rechazados y con error de envío no son comprobantes válidos: no suman.

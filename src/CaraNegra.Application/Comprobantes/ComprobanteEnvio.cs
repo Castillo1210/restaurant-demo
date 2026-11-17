@@ -142,6 +142,12 @@ public static class ComprobanteEnvio
                 c.MensajeSunat = Recortar(r.Mensaje ?? "El proveedor no aceptó los datos del comprobante.", MaxMensaje);
                 break;
 
+            case ResultadoFacturacion.Anulado:
+                c.Estado = EstadoComprobante.Anulado;
+                GuardarArchivos(c, r);
+                c.MensajeSunat = Recortar(r.Mensaje ?? "El comprobante figura anulado en SUNAT.", MaxMensaje);
+                break;
+
             case ResultadoFacturacion.Duplicado:
                 c.Estado = EstadoComprobante.ErrorEnvio;
                 c.MensajeSunat = Recortar(
@@ -157,7 +163,7 @@ public static class ComprobanteEnvio
         }
     }
 
-    private static void GuardarArchivos(Comprobante c, RespuestaFacturacion r)
+    internal static void GuardarArchivos(Comprobante c, RespuestaFacturacion r)
     {
         if (!string.IsNullOrWhiteSpace(r.Hash) && r.Hash.Length <= MaxHash) c.HashResumen = r.Hash;
         c.XmlUrl = Url(r.XmlUrl) ?? c.XmlUrl;
@@ -165,9 +171,9 @@ public static class ComprobanteEnvio
         c.PdfUrl = Url(r.PdfUrl) ?? c.PdfUrl;
     }
 
-    private static string? Url(string? url) =>
+    internal static string? Url(string? url) =>
         string.IsNullOrWhiteSpace(url) || url.Length > MaxUrl ? null : url;
 
-    private static string? Recortar(string? texto, int max) =>
+    internal static string? Recortar(string? texto, int max) =>
         texto is null ? null : texto.Length <= max ? texto : texto[..max];
 }

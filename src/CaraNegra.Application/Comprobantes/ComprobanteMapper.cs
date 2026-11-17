@@ -115,7 +115,36 @@ public static class ComprobanteMapper
                 MensajePie = empresa.MensajePie
             },
             Items = items,
-            Pagos = pagos
+            Pagos = pagos,
+            AnulacionEstado = c.AnulacionEstado,
+            AnulacionMetodo = c.AnulacionMetodo,
+            AnulacionMotivo = c.AnulacionMotivo,
+            AnulacionMensaje = c.AnulacionMensaje,
+            AnulacionSolicitadaEn = c.AnulacionSolicitadaEn,
+            DiasDesdeEmision = ComprobanteAnulacion.DiasDesdeEmision(c.FechaEmision),
+            MetodoAnulacionDisponible = ComprobanteAnulacion.MotivoNoSePuede(c) == null ? ComprobanteAnulacion.MetodoPara(c) : null,
+            PuedeCorregir = ComprobanteAnulacion.EstaVigente(c.Estado) && !ComprobanteAnulacion.EnCurso(c),
+            NotasCredito = (c.NotasCredito ?? new List<NotaCredito>())
+                .OrderBy(n => n.NotaCreditoId)
+                .Select(n => new NotaCreditoDto
+                {
+                    NotaCreditoId = n.NotaCreditoId,
+                    Numero = FormatearNumero(n.Serie, n.Correlativo),
+                    Codigo = n.Codigo,
+                    TipoDescripcion = ComprobanteAnulacion.DescripcionCodigo(n.Codigo),
+                    Motivo = n.Motivo,
+                    Correcciones = NotaCreditoEnvio.LineasCorreccion(n.Correcciones),
+                    Total = n.Total,
+                    FechaEmision = n.FechaEmision,
+                    Estado = n.Estado,
+                    Ambiente = string.IsNullOrEmpty(n.Ambiente) ? "SIMULADO" : n.Ambiente,
+                    MensajeSunat = n.MensajeSunat,
+                    PdfUrl = n.PdfUrl,
+                    XmlUrl = n.XmlUrl,
+                    CdrUrl = n.CdrUrl,
+                    EmitidoPor = n.Usuario?.NombreCompleto ?? string.Empty
+                })
+                .ToList()
         };
     }
 }

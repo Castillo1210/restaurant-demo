@@ -9,6 +9,8 @@ import { etiquetaMesa } from '../utils/mesaLabel';
 import { infoEstado, leyendaAmbiente, TONO_CLASES } from '../utils/estadoComprobante';
 import { reenviarComprobante } from '../services/comprobantesService';
 import { imprimirTicket } from '../utils/imprimir';
+import { useAuth } from '../context/AuthContext';
+import AnulacionComprobante from './AnulacionComprobante';
 
 /**
  * Representación impresa de una boleta/factura electrónica (formato ticket 80 mm), con el estado
@@ -34,6 +36,7 @@ const ETIQUETA_DOC = {
 export default function ComprobanteElectronico({ comprobante, onClose, onActualizado, onReemitir }) {
   const [qr, setQr] = useState(null);
   const [reintentando, setReintentando] = useState(false);
+  const { user } = useAuth();
 
   useEffect(() => {
     if (!comprobante?.cadenaQr) return;
@@ -142,6 +145,7 @@ export default function ComprobanteElectronico({ comprobante, onClose, onActuali
         </div>
 
         <div className="overflow-y-auto print:overflow-visible">
+          <AnulacionComprobante comprobante={c} esAdmin={user?.rol === 'ADMIN'} onActualizado={onActualizado} />
           <div id="recibo-imprimible" className="ticket px-5 py-4 text-[13px] leading-snug bg-white text-black">
             {/* Leyenda de demo / pruebas: visible e impresa mientras no sea un comprobante real */}
             {leyenda && (

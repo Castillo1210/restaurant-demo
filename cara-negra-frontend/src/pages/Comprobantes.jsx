@@ -280,7 +280,22 @@ export default function Comprobantes() {
                 hour: '2-digit',
                 minute: '2-digit',
               });
-              const badge = <EstadoBadge estado={estado} mensaje={c.mensajeSunat} />;
+              const anulando = ['PorEnviar', 'Pendiente'].includes(c.anulacionEstado);
+              const badge = (
+                <span className="inline-flex flex-wrap items-center gap-1">
+                  <EstadoBadge estado={estado} mensaje={c.mensajeSunat} />
+                  {anulando && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full border text-accentYellow border-yellow-800/60 bg-yellow-950/30">
+                      Anulando…
+                    </span>
+                  )}
+                  {c.notasCredito > 0 && (
+                    <span title="Tiene notas de crédito" className="text-[10px] font-bold px-1.5 py-0.5 rounded-full border text-gray-300 border-gray-700 bg-gray-900">
+                      NC {c.notasCredito}
+                    </span>
+                  )}
+                </span>
+              );
               return (
                 <button
                   key={c.comprobanteId}

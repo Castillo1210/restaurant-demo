@@ -63,6 +63,19 @@ public class Comprobante : BaseEntity
     public int IntentosEnvio { get; set; }
     public DateTime? UltimoEnvioEn { get; set; }
 
+    // ── Anulación ante SUNAT (ver ComprobanteAnulacion) ──
+
+    /// <summary>BAJA (factura), RESUMEN (boleta) o NOTA_CREDITO (fuera de plazo). Null si nunca se pidió.</summary>
+    public string? AnulacionMetodo { get; set; }
+    public string? AnulacionMotivo { get; set; }
+    public EstadoAnulacion? AnulacionEstado { get; set; }
+    /// <summary>Último mensaje del proveedor / SUNAT sobre la anulación.</summary>
+    public string? AnulacionMensaje { get; set; }
+    public DateTime? AnulacionSolicitadaEn { get; set; }
+    public int? AnuladoPorUsuarioId { get; set; }
+    public int AnulacionIntentos { get; set; }
+    public DateTime? AnulacionUltimoEnvioEn { get; set; }
+
     // Claves foráneas
     public int PedidoId { get; set; }
     public int UsuarioId { get; set; }
@@ -70,4 +83,5 @@ public class Comprobante : BaseEntity
     // Navegación
     public Pedido Pedido { get; set; } = null!;
     public Usuario Usuario { get; set; } = null!;
+    public ICollection<NotaCredito> NotasCredito { get; set; } = new List<NotaCredito>();
 }

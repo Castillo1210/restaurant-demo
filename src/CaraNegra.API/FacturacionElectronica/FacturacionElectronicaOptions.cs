@@ -35,4 +35,12 @@ public class FacturacionElectronicaOptions
     /// Si en la base ya hay números mayores en esa serie, se sigue desde la base.
     /// </summary>
     public Dictionary<string, int> UltimoNumeroPorSerie { get; set; } = new();
+
+    /// <summary>
+    /// Series de las notas de crédito: la que afecta a facturas empieza con F y la que afecta a
+    /// boletas con B (exigencia de SUNAT). Si el local ya emitió notas con otro sistema, su último
+    /// número va en UltimoNumeroPorSerie igual que las boletas y facturas.
+    /// </summary>
+    public string SerieNotaCreditoFactura { get; set; } = "FC01";
+    public string SerieNotaCreditoBoleta { get; set; } = "BC01";
 }

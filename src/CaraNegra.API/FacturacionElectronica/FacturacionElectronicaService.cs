@@ -14,8 +14,10 @@ namespace CaraNegra.API.FacturacionElectronica;
 /// Envío de comprobantes a APISUNAT (Lucode), un PSE: arma el XML, lo firma y lo envía a SUNAT.
 ///   Sandbox:    https://sandbox.apisunat.pe  (pruebas, NO llega a SUNAT)
 ///   Producción: https://app.apisunat.pe
-///   POST /api/v3/documents  → emitir
-///   POST /api/v3/status     → consultar estado { documento, serie, numero }
+///   POST /api/v3/documents      → emitir (boleta, factura, nota de crédito)
+///   POST /api/v3/status         → consultar estado { documento, serie, numero }
+///   POST /api/v3/voided         → comunicación de baja (anular factura, hasta 3 días)
+///   POST /api/v3/daily-summary  → resumen diario con acción "anular" (anular boleta, hasta 5 días)
 ///   Header: Authorization: Bearer {token}   (un token por empresa y por ambiente)
 ///
 /// Respuestas: 200 { success, message, payload: { estado: ACEPTADO|PENDIENTE|RECHAZADO, hash, xml,
@@ -95,6 +97,49 @@ public class FacturacionElectronicaService : IFacturacionElectronicaService
         return PostAsync("/api/v3/status", cuerpo, esConsulta: true, cancellationToken);
     }
 
+    public string SerieNotaCredito(TipoComprobante afectado) =>
+        ((afectado == TipoComprobante.Factura ? _options.SerieNotaCreditoFactura : _options.SerieNotaCreditoBoleta) ?? string.Empty)
+            .Trim().ToUpperInvariant() is { Length: 4 } serie
+            ? serie
+            : (afectado == TipoComprobante.Factura ? "FC01" : "BC01");
+
+    public Task<RespuestaFacturacion> AnularAsync(SolicitudAnulacion s, CancellationToken cancellationToken = default)
+    {
+        var motivo = string.IsNullOrWhiteSpace(s.Motivo) ? "ANULACIÓN DE LA OPERACIÓN" : s.Motivo.Trim();
+        if (motivo.Length > 100) motivo = motivo[..100];
+
+        if (s.Tipo == TipoComprobante.Factura)
+        {
+            var baja = new
+            {
+                documento = "comunicacion_baja",
+                motivo,
+                documento_afectado = new { documento = "factura", serie = s.Serie, numero = s.Numero.ToString() }
+            };
+            return PostAsync("/api/v3/voided", baja, esConsulta: false, cancellationToken);
+        }
+
+        var resumen = new
+        {
+            documento = "resumen_diario",
+            documentos_afectados = new[]
+            {
+                new { accion_resumen = "anular", documento = "boleta", serie = s.Serie, numero = s.Numero.ToString() }
+            }
+        };
+        return PostAsync("/api/v3/daily-summary", resumen, esConsulta: false, cancellationToken);
+    }
+
+    public Task<RespuestaFacturacion> EmitirNotaCreditoAsync(SolicitudComprobante solicitud, CancellationToken cancellationToken = default)
+    {
+        if (solicitud.NotaCredito is null)
+            return Task.FromResult(RespuestaFacturacion.De(ResultadoFacturacion.ErrorDatos, "Faltan los datos de la nota de crédito."));
+        return EnviarAsync(solicitud, cancellationToken);
+    }
+
+    public Task<RespuestaFacturacion> ConsultarNotaCreditoAsync(string serie, int numero, CancellationToken cancellationToken = default) =>
+        PostAsync("/api/v3/status", new { documento = "nota_credito", serie, numero }, esConsulta: true, cancellationToken);
+
     private async Task<RespuestaFacturacion> PostAsync(string ruta, object cuerpo, bool esConsulta, CancellationToken ct)
     {
         if (EsSimulado)
@@ -161,13 +206,16 @@ public class FacturacionElectronicaService : IFacturacionElectronicaService
 
         if (status == HttpStatusCode.OK && cuerpo?.Payload is { } p)
         {
-            var resultado = (p.Estado ?? string.Empty).Trim().ToUpperInvariant() switch
+            var estado = (p.Estado ?? string.Empty).Trim().ToUpperInvariant();
+            var resultado = estado switch
             {
                 "ACEPTADO" => ResultadoFacturacion.Aceptado,
                 "PENDIENTE" => ResultadoFacturacion.Pendiente,
                 "RECHAZADO" => ResultadoFacturacion.Rechazado,
                 // "OBSERVADO" también es aceptado por SUNAT (con observaciones).
                 "OBSERVADO" => ResultadoFacturacion.Aceptado,
+                // Consulta de un comprobante dado de baja / anulado en resumen.
+                _ when estado.Contains("ANUL") || estado.Contains("BAJA") => ResultadoFacturacion.Anulado,
                 _ => ResultadoFacturacion.Pendiente
             };
 

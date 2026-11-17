@@ -13,5 +13,6 @@ internal static class ComprobanteQueries
             .Include(c => c.Pedido).ThenInclude(p => p.Mesa).ThenInclude(m => m.Salon)
             .Include(c => c.Pedido).ThenInclude(p => p.Usuario)
             .Include(c => c.Pedido).ThenInclude(p => p.DetallesPedidos).ThenInclude(d => d.Producto)
-            .Include(c => c.Pedido).ThenInclude(p => p.Pagos).ThenInclude(p => p.MetodoPago);
+            .Include(c => c.Pedido).ThenInclude(p => p.Pagos).ThenInclude(p => p.MetodoPago)
+            .Include(c => c.NotasCredito).ThenInclude(n => n.Usuario);
 }

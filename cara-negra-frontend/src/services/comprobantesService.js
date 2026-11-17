@@ -86,6 +86,46 @@ export const reenviarComprobante = async (id) => {
   }
 };
 
+// ── Anulación y notas de crédito (solo ADMIN) ──
+
+const postSunat = async (url, body, mensaje) => {
+  try {
+    const { data } = await api.post(url, body, { timeout: TIMEOUT_SUNAT_MS });
+    return data;
+  } catch (error) {
+    throw new Error(getApiErrorMessage(error, mensaje));
+  }
+};
+
+/**
+ * Anula el comprobante ante SUNAT. El backend elige el camino: comunicación de baja (factura,
+ * hasta 3 días), resumen diario (boleta, hasta 5 días) o nota de crédito (fuera de plazo).
+ * @param {number} id
+ * @param {{ motivo:string, usarNotaCredito?:boolean }} datos
+ */
+export const anularComprobante = (id, datos) =>
+  postSunat(`/comprobantes/${id}/anular`, datos, 'No se pudo anular el comprobante');
+
+/** Reenvía o consulta una anulación en proceso. */
+export const reintentarAnulacion = (id) =>
+  postSunat(`/comprobantes/${id}/anulacion/reintentar`, null, 'No se pudo consultar la anulación');
+
+/** Marca como aceptada una baja / resumen pendiente (verificada en el panel de APISUNAT). */
+export const confirmarAnulacion = (id) =>
+  postSunat(`/comprobantes/${id}/anulacion/confirmar`, null, 'No se pudo confirmar la anulación');
+
+/**
+ * Nota de crédito por corrección de descripción (importes en cero).
+ * @param {number} id
+ * @param {{ motivo?:string, correcciones:string[] }} datos
+ */
+export const emitirNotaCorreccion = (id, datos) =>
+  postSunat(`/comprobantes/${id}/notas-credito`, datos, 'No se pudo emitir la nota de crédito');
+
+/** Reenvía o consulta una nota de crédito. Devuelve el comprobante actualizado. */
+export const reenviarNotaCredito = (notaId) =>
+  postSunat(`/comprobantes/notas-credito/${notaId}/reenviar`, null, 'No se pudo reenviar la nota de crédito');
+
 /** Número que llevará el próximo comprobante de una serie: { serie, numero, texto: 'B001-00000015' }. */
 export const getProximoNumero = async (serie) => {
   const { data } = await api.get('/comprobantes/proximo-numero', { params: { serie } });

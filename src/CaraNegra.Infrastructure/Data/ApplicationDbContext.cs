@@ -30,6 +30,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<MovimientoArticulo> MovimientosArticulo => Set<MovimientoArticulo>();
     public DbSet<Crema> Cremas => Set<Crema>();
     public DbSet<Comprobante> Comprobantes => Set<Comprobante>();
+    public DbSet<NotaCredito> NotasCredito => Set<NotaCredito>();
     public DbSet<Cliente> Clientes => Set<Cliente>();
     public DbSet<ConfiguracionEmpresa> ConfiguracionesEmpresa => Set<ConfiguracionEmpresa>();
     public DbSet<DispositivoAutorizado> DispositivosAutorizados => Set<DispositivoAutorizado>();
@@ -210,8 +211,40 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             e.HasIndex(c => c.PedidoId);
             e.HasIndex(c => c.FechaEmision);
 
+            // Anulación (comunicación de baja / resumen diario / nota de crédito).
+            e.Property(c => c.AnulacionMetodo).HasMaxLength(20);
+            e.Property(c => c.AnulacionMotivo).HasMaxLength(100);
+            e.Property(c => c.AnulacionEstado).HasConversion<string>().HasMaxLength(20);
+            e.Property(c => c.AnulacionMensaje).HasMaxLength(500);
+            e.HasIndex(c => c.AnulacionEstado);
+
             e.HasOne(c => c.Pedido).WithMany(p => p.Comprobantes).HasForeignKey(c => c.PedidoId);
             e.HasOne(c => c.Usuario).WithMany().HasForeignKey(c => c.UsuarioId);
+        });
+
+        // Notas de crédito: numeración propia por serie (FC01, BC01…).
+        modelBuilder.Entity<NotaCredito>(e =>
+        {
+            e.ToTable("NotasCredito");
+            e.Property(n => n.Serie).HasMaxLength(4).IsRequired();
+            e.Property(n => n.Codigo).HasMaxLength(2).IsRequired();
+            e.Property(n => n.Motivo).HasMaxLength(100).IsRequired();
+            e.Property(n => n.Correcciones).HasMaxLength(2000);
+            e.Property(n => n.OpGravada).HasColumnType("decimal(10,2)");
+            e.Property(n => n.Igv).HasColumnType("decimal(10,2)");
+            e.Property(n => n.Total).HasColumnType("decimal(10,2)");
+            e.Property(n => n.Estado).HasConversion<string>().HasMaxLength(20);
+            e.Property(n => n.Ambiente).HasMaxLength(12).HasDefaultValue("SIMULADO");
+            e.Property(n => n.HashResumen).HasMaxLength(64);
+            e.Property(n => n.MensajeSunat).HasMaxLength(500);
+            e.Property(n => n.XmlUrl).HasMaxLength(300);
+            e.Property(n => n.CdrUrl).HasMaxLength(300);
+            e.Property(n => n.PdfUrl).HasMaxLength(300);
+            e.HasIndex(n => new { n.Serie, n.Correlativo }).IsUnique();
+            e.HasIndex(n => n.Estado);
+
+            e.HasOne(n => n.Comprobante).WithMany(c => c.NotasCredito).HasForeignKey(n => n.ComprobanteId);
+            e.HasOne(n => n.Usuario).WithMany().HasForeignKey(n => n.UsuarioId).OnDelete(DeleteBehavior.Restrict);
         });
 
         // Clientes (caché local de la consulta DNI/RUC): un registro por documento.
