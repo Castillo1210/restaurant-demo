@@ -38,6 +38,20 @@
   display: none;
 }
 
+/* Letra de las comandas (la misma que usa la ticketera de cocina). Licencia: public/fonts/OFL-Carlito.txt */
+@font-face {
+  font-family: 'Carlito';
+  src: url('/fonts/Carlito-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-display: block;
+}
+@font-face {
+  font-family: 'Carlito';
+  src: url('/fonts/Carlito-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-display: block;
+}
+
 @media print {
   @page {
     margin: 0;
@@ -89,57 +103,37 @@
     font-size: 11px;
   }
 
-  /* Comanda impresa en caja (utils/comandaCaja.js): compacta, como la de cocina (sin líneas en blanco). */
-  #zona-impresion .ticket-comanda {
-    font-size: 13px;
+  /* Comanda impresa en caja (utils/comandaCaja.js): MISMO formato que la de la ticketera de
+     cocina (letra Carlito, mismos tamaños en mm, platos en una línea). Los tamaños de cada línea
+     los pone comandaCaja.js en línea según GET /impresion/comanda. */
+  #zona-impresion .ticket.ticket-comanda {
+    font-family: 'Carlito', Arial, sans-serif !important;
+    font-weight: 400;
+    padding: 1mm 0.5mm 0 0.5mm !important;
+  }
+  #zona-impresion .ticket-comanda .tc-linea {
+    white-space: nowrap;
+    overflow: hidden;
+  }
+  #zona-impresion .ticket-comanda .tc-envolver {
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
   #zona-impresion .ticket-comanda .tc-centro {
     text-align: center;
   }
-  #zona-impresion .ticket-comanda .tc-adicional {
-    text-align: center;
-    font-size: 15px;
-    font-weight: 800;
-  }
-  #zona-impresion .ticket-comanda .tc-mesa {
-    text-align: center;
-    font-size: 24px;
-    font-weight: 800;
-    line-height: 1.15;
-    margin: 0.5mm 0;
-  }
-  #zona-impresion .ticket-comanda .tc-fila {
+  #zona-impresion .ticket-comanda .tc-dos {
     display: flex;
     justify-content: space-between;
-    font-weight: 400;
+    gap: 2mm;
   }
-  #zona-impresion .ticket-comanda .tc-fila b {
-    font-weight: 800;
+  #zona-impresion .ticket-comanda b {
+    font-weight: 700;
   }
+  /* Separador: raya fina continua, como en la ticketera de cocina. */
   #zona-impresion .ticket-comanda .tc-sep {
-    border-top: 2px dashed #000;
-    margin: 1.5mm 0;
-  }
-  /* Platos en letra regular, como la comanda de cocina (Arial con 600 ya sale en negrita);
-     solo el nombre del mozo va en negrita. */
-  #zona-impresion .ticket-comanda .tc-item {
-    display: flex;
-    gap: 1.5mm;
-    font-size: 14px;
-    font-weight: 400;
-    line-height: 1.2;
-    margin-top: 0.6mm; /* productos seguidos: ahorra papel */
-  }
-  #zona-impresion .ticket-comanda .tc-sep + .tc-item {
-    margin-top: 0;
-  }
-  /* En la anulación los platos van en letra normal: cocina solo tiene que reconocerlos. */
-  #zona-impresion .ticket-comanda .tc-item-normal {
-    font-size: 13px;
-  }
-  #zona-impresion .ticket-comanda .tc-cant {
-    flex-shrink: 0;
-    min-width: 9.5mm;
+    border-top: 0.25mm solid #000;
+    margin: 0.75mm 0;
   }
   /* Nota de pedido (utils/precuenta.js): mismo formato que la cuenta previa que usaba el local. */
   #zona-impresion .ticket-precuenta { font-size: 13px; font-weight: 500; }
@@ -168,18 +162,4 @@
   #zona-impresion .ticket-precuenta .pc-linea span:nth-child(2) { overflow-wrap: anywhere; }
   #zona-impresion .ticket-precuenta .pc-total { font-size: 16px; font-weight: 800; margin-top: 0.5mm; }
   #zona-impresion .ticket-precuenta .pc-orden { text-align: center; font-size: 13px; margin-top: 9mm; }
-
-  /* Comentario general del pedido: antes de los platos, destacado. */
-  #zona-impresion .ticket-comanda .tc-comentario {
-    font-size: 15px;
-    font-weight: 800;
-    line-height: 1.25;
-    margin: 1mm 0;
-    word-break: break-word;
-  }
-  #zona-impresion .ticket-comanda .tc-nota {
-    font-size: 13px;
-    font-weight: 400;
-    margin-left: 11mm;
-  }
 }

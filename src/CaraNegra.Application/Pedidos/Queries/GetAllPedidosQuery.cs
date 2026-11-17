@@ -108,6 +108,7 @@ public class GetAllPedidosQueryHandler : IRequestHandler<GetAllPedidosQuery, Pag
             EstadoPedido = pedido.EstadoPedido,
             Comentario = pedido.Comentario,
             CreadoEn = pedido.CreadoEn,
+            PrecuentaImpresaEn = pedido.PrecuentaImpresaEn,
             Descuento = MapDescuento(pedido),
             Detalles = pedido.DetallesPedidos.Select(d => new PedidoDetalleDto
             {

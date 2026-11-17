@@ -21,6 +21,10 @@ namespace CaraNegra.API.Impresion;
 /// y se manda en modo raster (GS v 0): sale más fina y proporcional que la letra interna de la
 /// ticketera, que a doble tamaño se ve gruesa. Si no se puede dibujar, se imprime en modo texto.
 /// </summary>
+/// <summary>Medidas de la comanda (ver <see cref="ImpresoraCocinaService.Formato"/>).</summary>
+public sealed record FormatoComanda(float AnchoMm, float MargenMm, float EncabezadoMm, float NormalMm, float ProductosMm,
+    float AnuladosMm, float Interlineado, string TamanoProductos);
+
 public class ImpresoraCocinaService : IImpresoraCocinaService
 {
     private readonly ImpresoraCocinaOptions _options;
@@ -175,13 +179,35 @@ public class ImpresoraCocinaService : IImpresoraCocinaService
     /// <summary>Caracteres por línea en letra normal (80 mm: 42-48; 58 mm: 32).</summary>
     private int Columnas => Math.Clamp(_options.Columnas, 24, 64);
 
-    private Tamano TamanoProductos => (_options.TamanoProductos ?? string.Empty).Trim().ToLowerInvariant() switch
+    private Tamano TamanoProductos => LeerTamano(_options.TamanoProductos);
+
+    private static Tamano LeerTamano(string? tamano) => (tamano ?? string.Empty).Trim().ToLowerInvariant() switch
     {
         "grande" => Tamano.Grande,
         "intermedia" or "intermedio" => Tamano.Intermedio,
         "normal" => Tamano.Normal,
         _ => Tamano.Alto
     };
+
+    /// <summary>
+    /// Medidas de la comanda en milímetros (203 ppp = 8 puntos por mm), para que la comanda que
+    /// imprime el navegador en caja salga del mismo tamaño que la de la ticketera de cocina.
+    /// </summary>
+    public static FormatoComanda Formato(ImpresoraCocinaOptions options)
+    {
+        const float puntosPorMm = 8f;
+        var columnas = Math.Clamp(options.Columnas, 24, 64);
+        var productos = PuntosDe(new Linea(string.Empty, LeerTamano(options.TamanoProductos), Producto: true));
+        return new FormatoComanda(
+            AnchoMm: (columnas >= 42 ? 576 : 384) / puntosPorMm,
+            MargenMm: MargenPuntos / puntosPorMm,
+            EncabezadoMm: PuntosDe(new Linea(string.Empty, Tamano.Alto)) / puntosPorMm,
+            NormalMm: PuntosDe(new Linea(string.Empty)) / puntosPorMm,
+            ProductosMm: productos / puntosPorMm,
+            AnuladosMm: PuntosDe(new Linea(string.Empty, Tamano.Normal, Producto: true)) / puntosPorMm,
+            Interlineado: 1.2f,
+            TamanoProductos: string.IsNullOrWhiteSpace(options.TamanoProductos) ? "Alto" : options.TamanoProductos.Trim());
+    }
 
     /// <summary>Caracteres que entran en una línea con ese tamaño de letra (ver <see cref="Tamano"/>).</summary>
     private int AnchoDe(Tamano tamano) => tamano switch

@@ -19,6 +19,8 @@ public class PedidoDto
     public DescuentoAplicadoDto? Descuento { get; set; }
     public string? Comentario { get; set; }
     public DateTime CreadoEn { get; set; }
+    /// <summary>Última impresión de la nota de pedido (el cliente pidió la cuenta). Null si no se imprimió.</summary>
+    public DateTime? PrecuentaImpresaEn { get; set; }
 }
 
 /// <summary>Descuento aplicado a un pedido (Fase 7). Null si el pedido no tiene ninguno.</summary>

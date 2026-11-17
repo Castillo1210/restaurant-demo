@@ -54,7 +54,18 @@ const mapPedido = (p) => ({
   descuento: mapDescuento(p.descuento),
   comentario: p.comentario ?? '',
   creadoEn: p.creadoEn,
+  // Última impresión de la nota de pedido (el cliente pidió la cuenta): Caja lo muestra primero.
+  precuentaImpresaEn: p.precuentaImpresaEn ?? null,
 });
+
+/** Registra que se imprimió la nota de pedido (para ordenar Caja). Si falla, no interrumpe nada. */
+export const marcarPrecuenta = async (pedidoId) => {
+  try {
+    await api.post(`/pedidos/${pedidoId}/precuenta`);
+  } catch {
+    // Solo sirve para ordenar la lista de Caja.
+  }
+};
 
 /**
  * Crea un nuevo pedido (toma de orden). Ocupa la mesa automáticamente.

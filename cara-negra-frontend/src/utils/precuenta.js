@@ -6,6 +6,7 @@
 // ============================================================
 
 import { imprimirTicket, escaparHtml as e } from './imprimir';
+import { marcarPrecuenta } from '../services/ordersService';
 import { etiquetaMesa } from './mesaLabel';
 
 const S = (n) => `S/ ${Number(n ?? 0).toFixed(2)}`;
@@ -74,5 +75,7 @@ export function imprimirPrecuenta(pedido, { nombreComercial, razonSocial, direcc
     <div class="pc-orden">Orden ${e(pedido.id)} · ${e(etiquetaMesa(pedido.salonNombre, pedido.mesaNumero))}</div>
     <div class="pc-centro pc-chico">${e(fechaHora())}</div>
   `;
+  // El cliente pidió la cuenta: Caja muestra este pedido primero ("Pidieron la cuenta").
+  if (pedido?.id) marcarPrecuenta(pedido.id);
   return imprimirTicket(el);
 }

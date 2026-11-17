@@ -970,6 +970,9 @@ namespace CaraNegra.Infrastructure.Migrations
                     b.Property<int>("MesaId")
                         .HasColumnType("int");
 
+                    b.Property<DateTime?>("PrecuentaImpresaEn")
+                        .HasColumnType("datetime(6)");
+
                     b.Property<decimal>("SubTotal")
                         .HasColumnType("decimal(10,2)");
 

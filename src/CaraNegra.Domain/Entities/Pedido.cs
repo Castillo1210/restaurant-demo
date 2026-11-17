@@ -16,6 +16,12 @@ public class Pedido : BaseEntity
     /// </summary>
     public string? Comentario { get; set; }
 
+    /// <summary>
+    /// Última vez que se imprimió la nota de pedido (precuenta): el cliente pidió la cuenta.
+    /// En Caja estos pedidos salen primero ("Pidieron la cuenta").
+    /// </summary>
+    public DateTime? PrecuentaImpresaEn { get; set; }
+
     // Claves foraneas
     public int MesaId { get; set; }
     public int UsuarioId { get; set; }

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ArrowLeft, Plus, Minus, ShoppingBag, UtensilsCrossed, Search, SearchX, Maximize2, LayoutGrid, Ban } from 'lucide-react';
+import { X, ArrowLeft, Plus, Minus, ShoppingBag, UtensilsCrossed, Search, SearchX, Maximize2, LayoutGrid, Ban, Wallet } from 'lucide-react';
 import { useCart } from '../CartContext';
 import { getCategories, getMenuItems } from '../services/menuService';
 import { prepararIndice, buscarEnIndice, resaltarCoincidencias } from '../utils/buscarProductos';
@@ -73,6 +73,16 @@ export default function MenuDrawer({ isOpen, onClose }) {
   // Quitar platos: además, con el pedido ya "Listo" solo caja o admin (p. ej. el cliente rechazó
   // un plato que ya salió de cocina).
   const puedeQuitar = () => esSuMesa() && (user?.rol !== 'MOZO' || pedidoActual?.estado !== 'Listo');
+  // Cajero / admin: cobrar directo desde la mesa (abre Caja con este pedido).
+  const puedeCobrar = ['CAJERO', 'ADMIN'].includes(user?.rol);
+  const irACobrar = () => {
+    if (!pedidoActual) return;
+    if (cart.length > 0) {
+      toast.error('Hay platos nuevos sin enviar: envíalos o quítalos antes de cobrar.');
+      return;
+    }
+    navigate(`/caja?pedido=${pedidoActual.id}`);
+  };
 
   const cargarPedidoActual = useCallback(() => {
     if (!activeTable || activeTable.status !== 'occupied') {
@@ -343,6 +353,17 @@ export default function MenuDrawer({ isOpen, onClose }) {
               </p>
               <h2 className="text-lg font-extrabold tracking-tight leading-tight">{etiquetaMesa(activeTable?.salonNombre, activeTable?.numeroMesa)}</h2>
             </div>
+            {puedeCobrar && pedidoActual && (
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={irACobrar}
+                className="ml-auto flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-primary text-white font-extrabold text-sm hover:bg-primaryHover transition-colors shadow-lg shadow-primary/20"
+                title="Ir a Caja con este pedido"
+              >
+                <Wallet size={17} />
+                Cobrar
+              </motion.button>
+            )}
           </div>
 
           {/* En monitor: carta (izquierda) + listado del pedido (derecha). En celular: una columna. */}

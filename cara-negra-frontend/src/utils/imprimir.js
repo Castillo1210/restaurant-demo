@@ -27,7 +27,8 @@ export async function imprimirTicket(elemento) {
   document.body.appendChild(zona);
   document.body.classList.add('imprimiendo');
 
-  // El logo y el QR (imágenes) deben estar listos antes de mandar a imprimir.
+  // Las letras (p. ej. la de la comanda) y el logo y el QR (imágenes) deben estar listos antes de imprimir.
+  await document.fonts?.ready?.catch?.(() => {});
   await Promise.all(
     [...zona.querySelectorAll('img')].map((img) =>
       img.complete ? Promise.resolve() : (img.decode?.() ?? Promise.resolve()).catch(() => {})

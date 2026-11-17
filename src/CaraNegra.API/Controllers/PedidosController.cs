@@ -183,6 +183,14 @@ public class PedidosController : ControllerBase
             id, dto.Comentario, UsuarioActualId, soloPropios)));
     }
 
+    /// <summary>Se imprimió la nota de pedido (el cliente pidió la cuenta): Caja lo muestra primero.</summary>
+    [HttpPost("{id}/precuenta")]
+    public async Task<IActionResult> MarcarPrecuenta(int id)
+    {
+        await _mediator.Send(new CaraNegra.Application.Pedidos.MarcarPrecuentaCommand(id));
+        return NoContent();
+    }
+
     /// <summary>Precios distintos a la carta en este pedido (quién y cuándo).</summary>
     [HttpGet("{id}/cambios-precio")]
     public async Task<IActionResult> GetCambiosPrecio(int id)

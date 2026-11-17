@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Receipt, X, Ban, ReceiptText, Tag, FileText, CalendarClock, Printer, MessageSquareText, ListOrdered, AlertTriangle, Clock, Zap } from 'lucide-react';
+import { ChevronLeft, Receipt, X, Ban, ReceiptText, Tag, FileText, CalendarClock, Printer, MessageSquareText, ListOrdered, AlertTriangle, Clock, Zap, Search, User, HandCoins } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { getPedidos, getPedidoById, aplicarDescuento, quitarDescuento } from '../services/ordersService';
 import { getMetodosPago } from '../services/metodosPagoService';
@@ -30,16 +30,6 @@ import { parseFechaUtc } from '../utils/documentos';
 const horaLima = (fechaUtc) =>
   parseFechaUtc(fechaUtc)?.toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit' }) ?? '';
 
-const containerVariants = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.05 } },
-};
-
-const cardVariants = {
-  hidden: { opacity: 0, scale: 0.94, y: 10 },
-  show: { opacity: 1, scale: 1, y: 0, transition: { type: 'spring', stiffness: 260, damping: 22 } },
-};
-
 // Caja no filtra por estado: muestra cualquier pedido activo (todo menos Cancelado/Entregado).
 // El estado (que ahora mueve la pantalla de cocina en tiempo real) es solo una etiqueta
 // informativa, no un requisito para poder cobrar.
@@ -47,6 +37,23 @@ const ESTADO_PEDIDO_STYLES = {
   Pendiente: { text: 'text-accentYellow', bg: 'bg-yellow-950/40', border: 'border-yellow-900/40', label: 'Pendiente' },
   EnPreparacion: { text: 'text-primary', bg: 'bg-orange-950/40', border: 'border-orange-900/40', label: 'En preparación' },
   Listo: { text: 'text-accentGreen', bg: 'bg-emerald-950/40', border: 'border-emerald-900/40', label: 'Listo' },
+};
+
+// Búsqueda sin tildes ni mayúsculas ("jose" encuentra "José").
+const normalizar = (texto) => String(texto ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
+// "Pasto 2" antes que "Pasto 10": por salón y luego por número de mesa.
+const compararMesa = (a, b) =>
+  (a.salonNombre ?? '').localeCompare(b.salonNombre ?? '', 'es', { sensitivity: 'base' })
+  || String(a.mesaNumero ?? '').localeCompare(String(b.mesaNumero ?? ''), 'es', { numeric: true });
+
+// Tiempo que lleva abierto: "8 min", "1 h 25 min".
+const tiempoAbierto = (creadoEn, ahora) => {
+  const desde = parseFechaUtc(creadoEn);
+  if (!desde) return '';
+  const min = Math.max(0, Math.floor((ahora - desde.getTime()) / 60000));
+  if (min < 60) return `${min} min`;
+  return `${Math.floor(min / 60)} h ${min % 60} min`;
 };
 
 const saldoPendienteDe = (pedido) => {
@@ -58,6 +65,18 @@ const saldoPendienteDe = (pedido) => {
 
 export default function Caja() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Buscador por mozo (con el cursor puesto al abrir Caja), filtro por mozo y orden de la lista.
+  const [busqueda, setBusqueda] = useState('');
+  const [mozoFiltro, setMozoFiltro] = useState('');
+  const [orden, setOrden] = useState('antiguedad'); // 'antiguedad' | 'mesa'
+  const inputBusquedaRef = useRef(null);
+  const [ahora, setAhora] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setAhora(Date.now()), 60000);
+    return () => clearInterval(t);
+  }, []);
 
   const [pedidosActivos, setPedidosActivos] = useState([]);
   const [isLoadingLista, setIsLoadingLista] = useState(true);
@@ -165,6 +184,50 @@ export default function Caja() {
       setIsLoadingDetalle(false);
     }
   };
+
+  // "Cobrar" desde la mesa: /caja?pedido=123 abre directo el cobro de ese pedido.
+  useEffect(() => {
+    const id = Number(searchParams.get('pedido'));
+    if (!id) return;
+    setSearchParams({}, { replace: true });
+    abrirCobro({ id });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Si el cobro se abrió antes de cargar los métodos de pago, se elige el primero al llegar.
+  useEffect(() => {
+    if (pedidoSeleccionado?.total != null && metodoPagoId == null && metodos.length > 0) {
+      setMetodoPagoId(metodos[0].id);
+    }
+  }, [metodos, pedidoSeleccionado, metodoPagoId]);
+
+  // Mozos con pedidos abiertos (para el filtro) y la lista ya filtrada y ordenada:
+  // primero los que pidieron la cuenta (nota de pedido impresa), luego el resto.
+  const mozos = useMemo(() => {
+    const cuenta = new Map();
+    for (const p of pedidosActivos) {
+      const nombre = p.usuarioNombre || '—';
+      cuenta.set(nombre, (cuenta.get(nombre) ?? 0) + 1);
+    }
+    return [...cuenta.entries()].sort((a, b) => a[0].localeCompare(b[0], 'es'));
+  }, [pedidosActivos]);
+
+  const { pidieronCuenta, resto, totalFiltrado } = useMemo(() => {
+    const q = normalizar(busqueda);
+    const filtrados = pedidosActivos.filter((p) =>
+      (!mozoFiltro || (p.usuarioNombre || '—') === mozoFiltro)
+      && (!q || normalizar(p.usuarioNombre).includes(q)));
+    const porOrden = orden === 'mesa'
+      ? compararMesa
+      : (a, b) => new Date(a.creadoEn) - new Date(b.creadoEn);
+    return {
+      pidieronCuenta: filtrados
+        .filter((p) => p.precuentaImpresaEn)
+        .sort((a, b) => new Date(a.precuentaImpresaEn) - new Date(b.precuentaImpresaEn)),
+      resto: filtrados.filter((p) => !p.precuentaImpresaEn).sort(porOrden),
+      totalFiltrado: filtrados.length,
+    };
+  }, [pedidosActivos, busqueda, mozoFiltro, orden]);
 
   // Pedido que se está anulando completo (diálogo con motivo).
   const [anulandoPedido, setAnulandoPedido] = useState(null);
@@ -320,7 +383,7 @@ export default function Caja() {
     <div className="min-h-screen bg-background pb-10">
       {/* Contenido centrado con un ancho máximo: en el monitor de caja queda en el medio, con el
           mismo margen a ambos lados (nada pegado a los bordes de la pantalla). */}
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-6xl mx-auto">
       {/* ── Header ──────────────────────────────────────── */}
       <div className="px-5 pt-6 pb-4 flex flex-wrap items-center gap-3">
         <motion.button
@@ -425,47 +488,120 @@ export default function Caja() {
         </div>
       )}
 
-      <motion.div
-        variants={containerVariants}
-        initial="hidden"
-        animate="show"
-        className="px-5 grid grid-cols-1 gap-3"
-      >
-        {pedidosActivos.map((pedido) => {
-          const saldo = saldoPendienteDe(pedido);
-          const estiloEstado = ESTADO_PEDIDO_STYLES[pedido.estado] ?? ESTADO_PEDIDO_STYLES.Pendiente;
-          return (
-            <motion.button
-              key={pedido.id}
-              variants={cardVariants}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => abrirCobro(pedido)}
-              className="bg-card border border-gray-800/50 rounded-2xl p-4 flex justify-between items-center text-left hover:border-primary/40 transition-colors"
-            >
-              <div className="min-w-0 pr-3">
-                <div className="flex items-center gap-2">
-                  <p className="font-extrabold text-ink text-lg">{etiquetaMesa(pedido.salonNombre, pedido.mesaNumero)}</p>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${estiloEstado.bg} ${estiloEstado.border} ${estiloEstado.text}`}>
-                    {estiloEstado.label}
-                  </span>
-                </div>
-                <p className="text-xs text-gray-500 mt-0.5">Pedido #{pedido.id} · {pedido.detalles.length} ítems</p>
-                {pedido.comentario && (
-                  <p className="text-xs text-amber-400 font-semibold mt-0.5 flex items-center gap-1 min-w-0" title={pedido.comentario}>
-                    <MessageSquareText size={12} className="flex-shrink-0" /><span className="truncate">{pedido.comentario}</span>
-                  </p>
-                )}
-              </div>
-              <div className="text-right">
-                <p className="text-primary font-extrabold text-lg">S/ {saldo.toFixed(2)}</p>
-                {saldo < pedido.total && (
-                  <p className="text-[10px] text-gray-500">de S/ {pedido.total.toFixed(2)}</p>
-                )}
-              </div>
-            </motion.button>
-          );
-        })}
-      </motion.div>
+      {/* Buscador por mozo (cursor puesto al abrir), filtro por mozo y orden */}
+      {pedidosActivos.length > 0 && (
+        <div className="px-5 mb-3 space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="flex-1 min-w-[14rem] flex items-center gap-2 bg-card border border-gray-800/60 rounded-xl px-3 py-2 focus-within:border-primary/60">
+              <Search size={16} className="text-gray-500 flex-shrink-0" />
+              <input
+                ref={inputBusquedaRef}
+                autoFocus
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Escape') setBusqueda(''); }}
+                placeholder="Buscar por mozo…"
+                className="flex-1 bg-transparent text-sm text-ink placeholder:text-gray-600 focus:outline-none"
+              />
+              {busqueda && (
+                <button onClick={() => { setBusqueda(''); inputBusquedaRef.current?.focus(); }} className="text-gray-500 hover:text-gray-300" aria-label="Limpiar">
+                  <X size={14} />
+                </button>
+              )}
+            </label>
+            <div className="flex rounded-xl border border-gray-800/60 overflow-hidden text-xs font-bold">
+              {[['antiguedad', 'Más antiguos'], ['mesa', 'Por mesa']].map(([valor, texto]) => (
+                <button
+                  key={valor}
+                  onClick={() => setOrden(valor)}
+                  className={`px-3 py-2 transition-colors ${orden === valor ? 'bg-primary/20 text-primary' : 'bg-card text-gray-400 hover:text-gray-200'}`}
+                >
+                  {texto}
+                </button>
+              ))}
+            </div>
+          </div>
+          {mozos.length > 1 && (
+            <div className="flex flex-wrap gap-1.5">
+              {[['', 'Todos', pedidosActivos.length], ...mozos.map(([nombre, n]) => [nombre, nombre, n])].map(([valor, texto, n]) => (
+                <button
+                  key={valor || 'todos'}
+                  onClick={() => setMozoFiltro(valor)}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border transition-colors ${
+                    mozoFiltro === valor ? 'bg-primary/20 border-primary text-primary' : 'bg-card border-gray-800 text-gray-400 hover:border-gray-600'}`}
+                >
+                  {valor && <User size={11} />}
+                  {texto} <span className="opacity-60">({n})</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {!isLoadingLista && pedidosActivos.length > 0 && totalFiltrado === 0 && (
+        <p className="px-5 text-sm text-gray-500">Ningún pedido de ese mozo.</p>
+      )}
+
+      {[
+        { clave: 'cuenta', titulo: 'Pidieron la cuenta', lista: pidieronCuenta, destacado: true },
+        { clave: 'resto', titulo: pidieronCuenta.length > 0 ? 'Resto de mesas' : null, lista: resto, destacado: false },
+      ].filter((g) => g.lista.length > 0).map((grupo) => (
+        <section key={grupo.clave} className="px-5 mb-4">
+          {grupo.titulo && (
+            <h2 className={`text-[11px] font-bold uppercase tracking-wider mb-2 flex items-center gap-1.5 ${grupo.destacado ? 'text-primary' : 'text-gray-500'}`}>
+              {grupo.destacado && <HandCoins size={13} />}
+              {grupo.titulo} ({grupo.lista.length})
+            </h2>
+          )}
+          {/* Grilla compacta: en el monitor entran 3-4 mesas por fila. */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5">
+            {grupo.lista.map((pedido) => {
+              const saldo = saldoPendienteDe(pedido);
+              const estiloEstado = ESTADO_PEDIDO_STYLES[pedido.estado] ?? ESTADO_PEDIDO_STYLES.Pendiente;
+              return (
+                <motion.button
+                  key={pedido.id}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => abrirCobro(pedido)}
+                  className={`rounded-2xl p-3 text-left transition-colors border ${
+                    grupo.destacado
+                      ? 'bg-primary/10 border-primary/50 hover:border-primary'
+                      : 'bg-card border-gray-800/50 hover:border-primary/40'}`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-extrabold text-ink text-base leading-tight truncate">
+                      {etiquetaMesa(pedido.salonNombre, pedido.mesaNumero)}
+                    </p>
+                    <p className="text-primary font-extrabold text-base leading-tight whitespace-nowrap">S/ {saldo.toFixed(2)}</p>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 mt-1">
+                    <p className="text-[11px] text-gray-400 truncate flex items-center gap-1">
+                      <User size={11} className="flex-shrink-0" />
+                      <span className="truncate">{pedido.usuarioNombre || '—'}</span>
+                    </p>
+                    {saldo < pedido.total && (
+                      <p className="text-[10px] text-gray-500 whitespace-nowrap">de S/ {pedido.total.toFixed(2)}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-1.5 text-[10px] text-gray-500">
+                    <span className={`font-bold px-1.5 py-0.5 rounded-full border ${estiloEstado.bg} ${estiloEstado.border} ${estiloEstado.text}`}>
+                      {estiloEstado.label}
+                    </span>
+                    <span className="flex items-center gap-0.5"><Clock size={10} />{tiempoAbierto(pedido.creadoEn, ahora)}</span>
+                    <span>· #{pedido.id}</span>
+                  </div>
+                  {pedido.comentario && (
+                    <p className="text-[11px] text-amber-400 font-semibold mt-1 flex items-center gap-1 min-w-0" title={pedido.comentario}>
+                      <MessageSquareText size={11} className="flex-shrink-0" /><span className="truncate">{pedido.comentario}</span>
+                    </p>
+                  )}
+                </motion.button>
+              );
+            })}
+          </div>
+        </section>
+      ))}
 
       {/* ── Panel de cobro ──────────────────────────────── */}
       <AnimatePresence>
